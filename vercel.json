@@ -3,24 +3,16 @@
     "name": "sanbanfu2",
     "rewrites": [
         {
-            "source": "/paipan",
-            "destination": "/paipan.html"
-        },
-        {
             "source": "/",
             "destination": "/paipan.html"
         },
         {
-            "source": "/js/(.*)",
-            "destination": "/js/$1"
+            "source": "/paipan",
+            "destination": "/paipan.html"
         },
         {
-            "source": "/css/(.*)",
-            "destination": "/css/$1"
-        },
-        {
-            "source": "/assets/(.*)",
-            "destination": "/assets/$1"
+            "source": "/sanbanfu2",
+            "destination": "/paipan.html"
         }
     ],
     "cleanUrls": true

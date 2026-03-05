@@ -1,8 +1,8 @@
 {
     "name": "三板斧排盘",
     "short_name": "三板斧",
-    "start_url": "/sanbanfu2/",
-    "scope": "/sanbanfu2/",
+    "start_url": "",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#121212",
     "theme_color": "#121212",
