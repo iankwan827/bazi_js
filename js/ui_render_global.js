@@ -1617,6 +1617,30 @@ function setupSaveLoad() {
             saveModal.style.display = 'none';
         };
     }
+
+    // Load Modal Close Logic
+    if (loadCancel) {
+        console.log("load-cancel button initialized.");
+        loadCancel.onclick = (e) => {
+            console.log("load-cancel clicked.");
+            if (loadModal) loadModal.style.display = 'none';
+        };
+        // Also support touch for faster response on mobile
+        loadCancel.ontouchend = (e) => {
+            console.log("load-cancel touched.");
+            e.preventDefault();
+            if (loadModal) loadModal.style.display = 'none';
+        };
+    }
+
+    if (loadModal) {
+        loadModal.onclick = (e) => {
+            if (e.target === loadModal) {
+                console.log("loadModal background clicked, closing.");
+                loadModal.style.display = 'none';
+            }
+        };
+    }
 }
 
 function performSave(name) {
@@ -1659,17 +1683,7 @@ function performSave(name) {
 
 // btnLoad listener handled above in initUI block with logging
 
-if (loadCancel) {
-    loadCancel.addEventListener('click', () => {
-        loadModal.style.display = 'none';
-    });
-}
-
-if (loadModal) {
-    loadModal.addEventListener('click', (e) => {
-        if (e.target === loadModal) loadModal.style.display = 'none';
-    });
-}
+// loadCancel and loadModal listeners are now inside setupSaveLoad()
 
 function renderRecordList(list) {
     recordList.innerHTML = '';
