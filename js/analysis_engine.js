@@ -651,92 +651,119 @@ window.AnalysisEngine = (function () {
         if (!dmNode) return { level: '中和', percentage: 50, score: 50, max: 100, profile: [], isGuanYin: false, logs: [] };
 
         const dmWx = dmNode.wx;
-        let totalScore = 0;
-        let maxPossibleScore = 0;
 
-        // Weights: Year=10, Month=45, Day=20, Hour=15 (Reference: 身强弱.js line 138)
+        // 1. Pre-calculate the base denominator and weights for natal pillars
         const weights = { 0: 10, 1: 45, 2: 20, 3: 15 };
         const stemWeight = 10;
-        const logs = [];
-        let isGuanYin = false;
+        let natalTotalMax = 0;
 
-        // 1. Basic Score calculation
-        ctx.gods.forEach(g => {
-            if (!g || !g.category || g.isSecondary) return;
-            if (g.pillarIndex >= 4) return; // Only natal for body strength baseline
+        // ONLY loop through natal primary nodes (Indices 0-7)
+        for (let i = 0; i < 8; i++) {
+            const g = ctx.gods[i];
+            if (!g || !g.category) continue;
 
             let weight = g.isStem ? stemWeight : (weights[g.pillarIndex] || 0);
-
             if (!g.isStem) {
-                // Apply void multiplier (Reference: 身强弱.js line 163-164)
                 if (g.isKongWang) weight *= 0.3;
             } else {
-                // Apply void multiplier for stems (Reference: 身强弱.js line 147-148)
                 if (window.isPillarVoid && window.isPillarVoid(g.pillarIndex, ctx.raw.pillars)) {
                     weight *= 0.3;
                 }
             }
-
-            maxPossibleScore += weight;
-
-            const rel = WX_RELATION[dmWx]?.[g.wx];
-            if (rel === '同' || rel === '被生') {
-                totalScore += weight;
-
-                // [Expert] Month Branch Double count if it's Same Party (Reference: 身强弱.js line 171)
-                if (g.pillarIndex === 1 && !g.isStem) {
-                    totalScore += weight;
-                    logs.push("月令同党：二次加倍得分 (得令强势)");
-                }
-            }
-        });
-
-        // 2. Official-Seal Interaction (官印相生 / 官印局)
-        const monthZhiNode = ctx.getGodByIndex(3); // Month Branch Main Qi
-        const dayZhiNode = ctx.getGodByIndex(5);   // Day Branch Main Qi
-
-        if (monthZhiNode && dayZhiNode) {
-            const mRel = WX_RELATION[dmWx]?.[monthZhiNode.wx];
-            const dRel = WX_RELATION[dmWx]?.[dayZhiNode.wx];
-
-            if (mRel === '被克' && dRel === '被生') {
-                isGuanYin = true;
-                const bonus = maxPossibleScore * 0.16;
-                totalScore += bonus;
-                logs.push(`触发“官印相生”结构加分: +${bonus.toFixed(1)}`);
-            }
+            natalTotalMax += weight;
         }
 
-        let percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 1000) / 10 : 50;
+        // 2. Evaluation Helper
+        const evaluateStrength = (targetWx, includeStructuralBonuses = false) => {
+            let totalScore = 0;
+            let rawWeight = 0;
+            const elementLogs = [];
 
-        // Thresholds: 51.5+ for Strong, 48.5- for Weak (Reference: 身强弱.js line 193)
-        let level = percentage > 51.5 ? '身强' : (percentage < 48.5 ? '身弱' : '中和');
+            // ONLY loop through natal primary nodes (Indices 0-7)
+            for (let i = 0; i < 8; i++) {
+                const g = ctx.gods[i];
+                if (!g || !g.category) continue;
+
+                let weight = g.isStem ? stemWeight : (weights[g.pillarIndex] || 0);
+                if (!g.isStem) {
+                    if (g.isKongWang) weight *= 0.3;
+                } else {
+                    if (window.isPillarVoid && window.isPillarVoid(g.pillarIndex, ctx.raw.pillars)) {
+                        weight *= 0.3;
+                    }
+                }
+
+                if (g.wx === targetWx) rawWeight += weight;
+
+                const rel = WX_RELATION[targetWx]?.[g.wx];
+                if (rel === '同' || rel === '被生') {
+                    totalScore += weight;
+                    // Month command double count
+                    if (g.pillarIndex === 1 && !g.isStem) {
+                        totalScore += weight;
+                        if (includeStructuralBonuses) elementLogs.push("月令同党：二次加倍得分 (得令强势)");
+                    }
+                }
+            }
+
+
+            // Day Master specific structural bonuses
+            let dmBonusActive = false;
+            if (includeStructuralBonuses) {
+                const monthZhiNode = ctx.getGodByIndex(3);
+                const dayZhiNode = ctx.getGodByIndex(5);
+                if (monthZhiNode && dayZhiNode) {
+                    const mRel = WX_RELATION[targetWx]?.[monthZhiNode.wx];
+                    const dRel = WX_RELATION[targetWx]?.[dayZhiNode.wx];
+                    if (mRel === '被克' && dRel === '被生') {
+                        dmBonusActive = true;
+                        const bonus = natalTotalMax * 0.16;
+                        totalScore += bonus;
+                        elementLogs.push(`触发“官印相生”结构加分: +${bonus.toFixed(1)}`);
+                    }
+                }
+            }
+
+            const percentage = natalTotalMax > 0 ? Math.round((totalScore / natalTotalMax) * 1000) / 10 : 50;
+            return {
+                totalScore,
+                rawWeight,
+                percentage,
+                isStrong: percentage > 51.5,
+                isGuanYin: dmBonusActive,
+                logs: elementLogs
+            };
+        };
+
+        // 3. Main Result
+        const dmResult = evaluateStrength(dmWx, true);
+        const level = dmResult.percentage > 51.5 ? '身强' : (dmResult.percentage < 48.5 ? '身弱' : '中和');
 
         const profile = ['木', '火', '土', '金', '水'].map(el => {
-            let elScore = 0;
-            ctx.gods.forEach(g => {
-                if (!g || g.isSecondary || g.pillarIndex >= 4) return;
-                if (g.wx === el) {
-                    let w = g.isStem ? stemWeight : (weights[g.pillarIndex] || 0);
-                    if (!g.isStem && g.isKongWang) w *= 0.3;
-                    elScore += w;
-                }
-            });
+            const res = evaluateStrength(el, false);
             const relToGod = { '同': '比劫', '生': '食伤', '克': '财星', '被克': '官杀', '被生': '印星' };
-            return { element: el, score: elScore, tenGod: relToGod[WX_RELATION[dmWx]?.[el]] || '' };
+            return {
+                element: el,
+                score: res.rawWeight,
+                strengthScore: res.totalScore,
+                percentage: res.percentage,
+                isStrong: res.isStrong,
+                tenGod: relToGod[WX_RELATION[dmWx]?.[el]] || ''
+            };
         });
 
         return {
-            score: totalScore,
-            max: maxPossibleScore,
-            percentage: percentage,
+            score: dmResult.totalScore,
+            max: natalTotalMax,
+            percentage: dmResult.percentage,
             status: level.replace('身', ''),
             level: level.includes('身') ? level : '身' + level,
             profile: profile,
-            isGuanYin,
-            logs
+            isGuanYin: dmResult.isGuanYin,
+            logs: dmResult.logs
         };
     }
+
 
     function calculateOOYongXiJi(ctx, bsResult) {
         if (!ctx) return { mode: '扶抑', yong: '木', xi: '火', ji: '金', reason: '默认' };
