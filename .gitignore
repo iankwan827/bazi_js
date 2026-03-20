@@ -1,5 +1,14 @@
-.claude/
-temp/
-test_output.md
-test_error.log
-*.log
+# Ignore everything by default
+/*
+
+# Un-ignore the 4 specific files
+!paipan_node_core.js
+!paipan_node_input.js
+!ARCHITECTURE.md
+!bazi_classes.js
+
+# Also keep the .gitignore configuration
+!.gitignore
+
+# Keep the sync script locally but you can ignore it from repo if you want
+# !sync_to_github.bat
