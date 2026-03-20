@@ -1,0 +1,918 @@
+/* Modern Dark Theme for Bazi Web App */
+
+
+:root {
+    /* Compact Layout (Mobile Friendly) */
+    --dayun-col-width: 75px;
+    /* Reduced from 90px */
+    --dayun-header-width: 45px;
+    /* Reduced from 50px */
+    --matrix-cell-height: 40px;
+    /* Reduced from 50px */
+    --matrix-font-size: 12px;
+    /* Reduced from 14px */
+    --gz-font-size: 14px;
+    /* Reduced from 16px */
+    --matrix-padding: 1px;
+}
+
+/* Removed media query - always grand */
+
+body {
+    background-color: #121212;
+    /* Darker outside background */
+    color: #ffffff;
+    font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.app-container {
+    padding: 0;
+    min-height: 100vh;
+    width: 100%;
+    /* Flexible max-width */
+    max-width: 500px;
+    background-color: #121212;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow-x: hidden;
+}
+
+.card {
+    background-color: #252525;
+    border-radius: 12px;
+    border: 1px solid #333;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.center-card {
+    max-width: 95%;
+    /* Fix: avoid overflow on mobile */
+    margin: 20px auto;
+    width: calc(100% - 30px);
+}
+
+.header-title {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #d35400;
+    margin-bottom: 10px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group.row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.row-right {
+    display: flex;
+    align-items: center;
+}
+
+label {
+    color: #aaa;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+select {
+    background-color: #1e1e1e;
+    color: #eee;
+    border: 1px solid #3d3d3d;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 15px;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+select:focus {
+    border-color: #2980b9;
+    background-color: #252525;
+}
+
+input[type="datetime-local"] {
+    background-color: #252525;
+    color: white;
+    border: 1px solid #444;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    outline: none;
+}
+
+.primary-btn {
+    background-color: #d35400;
+    color: white;
+    padding: 15px;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 16px;
+    width: 100%;
+    transition: background-color 0.2s;
+}
+
+.primary-btn:active {
+    background-color: #e67e22;
+}
+
+.spacer {
+    flex-grow: 1;
+}
+
+/* Result View */
+.top-bar {
+    display: flex;
+    flex-direction: column;
+    /* Stack on mobile if needed, or allow flexible header */
+    background-color: #000000;
+    padding: 5px 10px;
+    border-bottom: 1px solid #333;
+}
+
+/* On wider screens, keep standard row */
+@media (min-width: 500px) {
+    .top-bar {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        height: 50px;
+        padding: 0 10px;
+    }
+}
+
+.nav-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Hide scrollbar Hide scrollbar */
+}
+
+.nav-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.nav-tab {
+    background: transparent;
+    color: #888;
+    border: none;
+    padding: 8px 10px;
+    /* Reduced */
+    font-size: 14px;
+    /* Reduced from 16px */
+    white-space: nowrap;
+    /* No vertical stacking */
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+}
+
+
+.nav-tab:hover {
+    color: #ccc;
+}
+
+.nav-tab.active {
+    color: #e67e22;
+    border-bottom: 2px solid #e67e22;
+    font-weight: bold;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.header-date {
+    font-size: 12px;
+    /* Reduced from 14px */
+    color: #aaa;
+    margin-top: 4px;
+}
+
+.nav-btn {
+    background-color: #333;
+    color: #ccc;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    border: 1px solid #444;
+}
+
+.btn-primary {
+    background-color: #2b4b6b;
+    background: linear-gradient(180deg, #3a5b7b 0%, #2b4b6b 100%);
+    border: 1px solid #4a6b8b;
+    color: #fff;
+    font-weight: bold;
+}
+
+.btn-primary:active {
+    background: #1b3b5b;
+}
+
+.scroll-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-bottom: 0;
+    /* Removed 20px */
+}
+
+/* Chart Grid */
+.chart-grid-container {
+    padding: 0;
+    overflow: hidden;
+}
+
+.chart-grid {
+    display: grid;
+    /* 7 columns: Header + 6 Pillars/Data */
+    grid-template-columns: 35px repeat(6, 1fr);
+    border-top: 1px solid #383838;
+    border-left: 1px solid #383838;
+    min-width: 340px;
+    /* Ensure basic width on tiny screens, allow scroll if needed */
+}
+
+.row-header-cell {
+    background-color: #1a1a1a;
+    font-size: 12px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    writing-mode: vertical-rl;
+    /* Vertical Text */
+    border-right: 1px solid #383838;
+    border-bottom: 1px solid #383838;
+    padding: 2px;
+    letter-spacing: 2px;
+}
+
+.cell {
+    border-right: 1px solid #383838;
+    border-bottom: 1px solid #383838;
+    padding: 2px;
+    /* Reduced from 5px */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-height: 35px;
+    /* Reduced from 40px */
+}
+
+.cell-header {
+    background-color: #252525;
+    color: #888;
+    font-size: 12px;
+}
+
+.pillar-char {
+    font-family: "KaiTi", "SimKai", serif;
+    font-size: 20px;
+    /* Reduced from 24px */
+    font-weight: bold;
+}
+
+.ten-god {
+    font-size: 12px;
+}
+
+.hidden-stems {
+    font-size: 10px;
+    color: #aaa;
+    display: flex;
+    flex-direction: column;
+}
+
+.shen-sha {
+    font-size: 10px;
+    color: #bbb;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Da Yun List */
+.dayun-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+    padding-top: 10px;
+}
+
+.dayun-item {
+    background-color: #252525;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.dayun-item.active {
+    background-color: #3e2723;
+    border: 2px solid #d35400;
+}
+
+.dayun-gz {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.dayun-age {
+    font-size: 12px;
+    color: #888;
+}
+
+.liunian-grid {
+    display: none;
+    /* Only show for active? Or maybe popup? Python shows below pillars */
+}
+
+/* Interactions */
+.inter-row {
+    display: flex;
+    margin-bottom: 5px;
+}
+
+.inter-row .label {
+    width: 50px;
+    color: #aaa;
+}
+
+.inter-row .value {
+    color: #eee;
+}
+
+/* Scrollbar Styling for Dark Theme */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #444;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
+
+/* Da Yun Matrix Layout (Replaces List) */
+.dayun-scroll-container {
+    background-color: #1e1e1e;
+    /* Container Borders (Top and Left) to complete the grid */
+    border-top: 1px solid #383838;
+    border-left: 1px solid #383838;
+    border-right: none;
+    border-bottom: none;
+
+    border-radius: 0;
+    position: relative;
+    overflow: auto;
+    max-height: 80vh;
+    /* Allow large scroll area */
+}
+
+
+.dayun-grid {
+    /* Grid using vars */
+    /* Header (var) + Repeat (var) */
+    /* Note: JS sets inline style for columns usually, but let's default it here */
+    display: grid;
+    gap: 0;
+    /* Zero spacing for table lines */
+    padding: 0;
+    width: max-content;
+}
+
+/* Common Cell Styles for Matrix */
+.matrix-cell {
+    background-color: #252525;
+    /* Right and Bottom Borders for Grid */
+    border-right: 1px solid #383838;
+    border-bottom: 1px solid #383838;
+    border-top: none;
+    border-left: none;
+
+    border-radius: 0;
+    /* Table look */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--matrix-padding);
+    /* height via min-height so it stretches to fill row */
+    min-height: var(--matrix-cell-height);
+    height: auto;
+    box-sizing: border-box;
+    font-size: var(--matrix-font-size);
+}
+
+/* Titles */
+.matrix-title {
+    background-color: #1a1a1a;
+    /* Darker bg for titles */
+    border-right: 1px solid #383838;
+    border-bottom: 1px solid #383838;
+    color: #e74c3c;
+    font-weight: bold;
+    font-size: 16px;
+    /* Reduced from 24px */
+    /* Title size from Py */
+    z-index: 10;
+}
+
+/* Sticky Positioning */
+.sticky-corner {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 50;
+    background-color: #1a1a1a;
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background-color: #252525;
+}
+
+.sticky-left {
+    position: sticky;
+    left: 0;
+    z-index: 40;
+    background-color: #252525;
+    /* Or transparent if cell has bg */
+}
+
+/* Cell Content Styles */
+.dayun-header-cell {
+    /* Fixed Width via Var? No, grid controls width. */
+    background-color: #252525;
+    font-weight: bold;
+    color: #d35400;
+    /* height via var */
+}
+
+.dayun-header-cell.active {
+    /* Highlight Style */
+    background-color: #3e2723;
+    border: 2px solid #d35400;
+    /* Full border override */
+    z-index: 45;
+    /* Above neighbors */
+}
+
+/* Reduced from 18px */
+font-weight: bold;
+font-family: "KaiTi",
+"SimKai",
+serif;
+margin-bottom: 2px;
+}
+
+.dayun-gz {
+    font-size: var(--gz-font-size);
+    font-weight: bold;
+    font-family: "KaiTi", "SimKai", serif;
+    margin-bottom: 4px;
+}
+
+.dayun-info {
+    font-size: 11px;
+    /* Reduced from 14px */
+    color: #d35400;
+    /* Orange text */
+    text-align: center;
+    line-height: 1.1;
+    font-weight: bold;
+}
+
+/* Liu Nian Cells */
+.liunian-cell {
+    cursor: pointer;
+}
+
+.liunian-cell:hover {
+    background-color: #2a2a2a;
+}
+
+.liunian-cell.current-year {
+    background-color: #3e2723;
+    border: 2px solid #d35400;
+    z-index: 5;
+}
+
+.liunian-cell.selected {
+    border: 2px solid #f39c12;
+    z-index: 6;
+}
+
+.liunian-gz {
+    font-size: 14px;
+    /* Reduced from 20px */
+    font-weight: bold;
+    font-family: "KaiTi", "SimKai", serif;
+}
+
+.liunian-year {
+    font-size: 11px;
+    /* Reduced from 13px */
+    color: #888;
+    text-align: center;
+}
+
+/* --- Picker Modal --- */
+.picker-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1000;
+    display: none;
+    /* toggled by JS */
+    align-items: flex-end;
+    /* Bottom sheet on mobile */
+    justify-content: center;
+}
+
+.picker-content {
+    background: #2d2d2d;
+    width: 100%;
+    max-width: 600px;
+    /* Limit width on desktop */
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    height: 380px;
+    /* Increased to accommodate header/body/footer */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Center on Desktop */
+@media (min-width: 600px) {
+    .picker-modal {
+        align-items: center;
+    }
+
+    .picker-content {
+        border-radius: 12px;
+        width: 500px;
+    }
+}
+
+.picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid #3d3d3d;
+    background: #333;
+    height: 44px;
+    /* Fixed height */
+    box-sizing: border-box;
+}
+
+.picker-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #eee;
+}
+
+.picker-btn {
+    background: transparent;
+    border: none;
+    color: #bbb;
+    font-size: 15px;
+    padding: 5px 10px;
+}
+
+.picker-btn.mobile-confirm {
+    color: #d35400;
+    font-weight: bold;
+}
+
+.picker-body {
+    position: relative;
+    /* Removed flex: 1 to ensure fixed height */
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    height: 250px;
+    /* Fixed height for wheel */
+}
+
+/* Highlight Bar */
+.picker-highlight {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    margin-top: -20px;
+    background: rgba(211, 84, 0, 0.2);
+    border-top: 1px solid rgba(211, 84, 0, 0.5);
+    border-bottom: 1px solid rgba(211, 84, 0, 0.5);
+    pointer-events: none;
+    /* Let clicks pass through */
+    z-index: 10;
+}
+
+.picker-col-group {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    justify-content: space-around;
+}
+
+
+.picker-col {
+    height: 100%;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    flex: 1;
+    /* Allow flex distribution */
+    text-align: center;
+    scrollbar-width: none;
+}
+
+.picker-col::-webkit-scrollbar {
+    display: none;
+}
+
+.picker-item {
+    height: 40px;
+    line-height: 40px;
+    font-size: 16px;
+    color: #666;
+    /* Grey for unselected */
+    scroll-snap-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+    user-select: none;
+    /* Prevent text cursor */
+    border-radius: 4px;
+}
+
+.picker-item:hover {
+    color: #bbb;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.picker-item.selected {
+    color: #d35400;
+    /* Orange highlight */
+    font-weight: bold;
+    font-size: 20px;
+    /* Larger font */
+}
+
+/* Footer & Buttons */
+.picker-footer {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px;
+    gap: 15px;
+    border-top: 1px solid #3d3d3d;
+    background: #333;
+    height: 86px;
+    /* Fixed height */
+    box-sizing: border-box;
+}
+
+.picker-btn-cancel,
+.picker-btn-confirm {
+    flex: 1;
+    padding: 12px;
+    border-radius: 6px;
+    border: none;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.picker-btn-cancel {
+    background-color: #444;
+    color: #bbb;
+}
+
+.picker-btn-confirm {
+    background-color: #d35400;
+    color: white;
+}
+
+.picker-close-icon {
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.picker-spacer {
+    /* Use calc for perfect centering */
+    height: calc(50% - 20px);
+}
+
+/* --- Expert Mode UI --- */
+.expert-container {
+    background-color: #252525;
+    border-radius: 8px;
+    padding: 15px;
+    margin-top: 10px;
+    border: 1px solid #3d3d3d;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.expert-chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+}
+
+.expert-chip {
+    padding: 6px 12px;
+    background: #333;
+    border: 1px solid #444;
+    border-radius: 20px;
+    font-size: 13px;
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.expert-chip:hover {
+    border-color: #d35400;
+}
+
+.expert-chip.active {
+    background: #d35400;
+    color: white;
+    border-color: #d35400;
+    box-shadow: 0 2px 8px rgba(211, 84, 0, 0.4);
+}
+
+/* iOS Toggle Switch */
+.expert-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.toggle-label {
+    font-size: 14px;
+    color: #aaa;
+    font-weight: bold;
+}
+
+.ios-switch {
+    display: flex;
+    background: #333;
+    border-radius: 20px;
+    height: 32px;
+    width: 100px;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid #444;
+}
+
+.ios-switch .switch-option {
+    flex: 1;
+    z-index: 2;
+    text-align: center;
+    line-height: 32px;
+    font-size: 13px;
+    color: #888;
+    transition: color 0.2s;
+}
+
+.ios-switch .switch-option.active {
+    color: #fff;
+    font-weight: bold;
+}
+
+.ios-switch .switch-handle {
+    position: absolute;
+    top: 2px;
+    bottom: 2px;
+    width: 48px;
+    background: #444;
+    border-radius: 18px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+}
+
+.ios-switch[data-state="偏"] .switch-handle {
+    transform: translateX(48px);
+}
+
+/* Diagnostic Reports */
+.expert-report {
+    background: #1a1a1a;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.report-section {
+    margin-bottom: 12px;
+}
+
+.report-section:last-child {
+    margin-bottom: 0;
+}
+
+.report-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #d35400;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.report-item {
+    font-size: 13px;
+    color: #ddd;
+    margin-bottom: 4px;
+    padding-left: 10px;
+    position: relative;
+}
+
+.report-item::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #d35400;
+}
+
+.subs-note {
+    font-size: 12px;
+    color: #e67e22;
+    font-style: italic;
+    background: rgba(230, 126, 34, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 10px;
+}

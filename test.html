@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Paipan</title>
+</head>
+<body>
+    <h2>Input: 2000-1-1 12:00:00</h2>
+    <div id="result"></div>
+    <script src="paipan_result.js"></script>
+    <script>
+        const testDate = new Date(2000, 0, 1, 12, 0, 0);
+        console.log('Input Date:', testDate.toISOString());
+
+        try {
+            const result = calculateBazi(testDate, '1', null, false);
+            console.log('Result:', result);
+
+            if (result) {
+                document.getElementById('result').innerHTML = `
+                    <h3>Solar: ${result.solarDateStr}</h3>
+                    <h3>Lunar: ${result.lunarStr}</h3>
+                    <h3>Pillars:</h3>
+                    <pre>${JSON.stringify(result.pillars, null, 2)}</pre>
+                `;
+            } else {
+                document.getElementById('result').innerHTML = '<p>Result is null</p>';
+            }
+        } catch(e) {
+            console.error(e);
+            document.getElementById('result').innerHTML = '<p>Error: ' + e.message + '</p>';
+        }
+    </script>
+</body>
+</html>

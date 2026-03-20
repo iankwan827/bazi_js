@@ -1,0 +1,5 @@
+.claude/
+temp/
+test_output.md
+test_error.log
+*.log

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>extracted_features - Bazi Component Demo</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { padding: 20px; box-sizing: border-box; background-color: #121212; color: #fff; }
+        .demo-container { max-width: 900px; margin: 0 auto; overflow-x: auto; }
+        #result-view { margin-top: 30px; display: none; width: 100%; }
+        .view-section { display: flex; flex-direction: column; }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <!-- Input Section (Figure 1) -->
+        <div id="input-view" class="view-section active">
+            <div class="card center-card">
+                <h1 class="header-title">八字排盘</h1>
+                
+                <div class="form-group">
+                    <label>输入模式</label>
+                    <select id="input-mode">
+                        <option value="0">日期排盘</option>
+                        <option value="1">八字反推</option>
+                    </select>
+                </div>
+
+                <div id="date-mode-container">
+                    <div class="form-group">
+                        <label>历法类型</label>
+                        <select id="cal-type">
+                            <option value="0">公历 (Solar)</option>
+                            <option value="1">农历 (Lunar)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="lbl-date-title">出生时间 (公历)</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button id="btn-open-picker" class="nav-btn" style="flex: 1; text-align: left;">2000-01-01 12:00</button>
+                            <label style="margin-bottom:0; display:flex; align-items:center; gap:5px; font-size:12px;">
+                                <input type="checkbox" id="chk-unknown-hour"> 时辰不详
+                            </label>
+                        </div>
+                        <input type="hidden" id="h-year" value="2000">
+                        <input type="hidden" id="h-month" value="1">
+                        <input type="hidden" id="h-day" value="1">
+                        <input type="hidden" id="h-hour" value="12">
+                        <input type="hidden" id="h-min" value="0">
+                    </div>
+                </div>
+
+                <div id="manual-mode-container" style="display: none;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                        <div><label>年干支</label><div style="display:flex;gap:5px;"><select id="mz-y-gan"></select><select id="mz-y-zhi"></select></div></div>
+                        <div><label>月干支</label><div style="display:flex;gap:5px;"><select id="mz-m-gan"></select><select id="mz-m-zhi"></select></div></div>
+                        <div><label>日干支</label><div style="display:flex;gap:5px;"><select id="mz-d-gan"></select><select id="mz-d-zhi"></select></div></div>
+                        <div><label>时干支</label><div style="display:flex;gap:5px;"><select id="mz-t-gan"></select><select id="mz-t-zhi"></select></div></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>性别</label>
+                    <select id="gender-input">
+                        <option value="1">男</option>
+                        <option value="0">女</option>
+                    </select>
+                </div>
+
+                <button id="btn-calc" class="primary-btn btn-primary" style="margin-top: 10px;">开始排盘</button>
+            </div>
+        </div>
+
+        <!-- Result Section (Figure 2) -->
+        <div id="result-view" class="view-section">
+            <div id="chart-grid" class="chart-grid-container" style="margin-bottom: 20px;"></div>
+            <div id="dayun-list" class="dayun-list"></div>
+            <button onclick="document.getElementById('result-view').style.display='none';document.getElementById('input-view').style.display='block';" 
+                    style="margin-top: 20px; padding: 10px; background: #333; color: #fff; border-radius: 4px;">返回修改</button>
+        </div>
+    </div>
+
+    <!-- Picker Modal -->
+    <div id="picker-modal" class="picker-modal">
+        <div class="picker-content">
+            <div class="picker-header">
+                <span class="picker-title">选择时间</span>
+                <button id="picker-cancel" class="picker-btn">取消</button>
+            </div>
+            <div class="picker-body">
+                <div class="picker-col-group">
+                    <div class="picker-col" id="wheel-year"></div>
+                    <div class="picker-col" id="wheel-month"></div>
+                    <div class="picker-col" id="wheel-day"></div>
+                    <div class="picker-col" id="wheel-hour"></div>
+                    <div class="picker-col" id="wheel-min"></div>
+                </div>
+                <div class="picker-highlight"></div>
+            </div>
+            <div class="picker-footer">
+                <button id="picker-confirm" class="picker-btn-confirm">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="paipan_result.js"></script>
+    <script src="paipan_input.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize Input Component
+            window.initPaipanInput({
+                onCalculate: (input) => {
+                    console.log("Input Data:", input);
+                    
+                    // Call the core calculation logic (from bazi_core.js)
+                    let finalDate;
+                    if (input.mode == 0) {
+                        if (input.calType == 1) { // Lunar
+                            const l = Lunar.fromYmdHms(input.year, input.month, input.day, input.hour, input.min, 0);
+                            const s = l.getSolar();
+                            finalDate = new Date(s.getYear(), s.getMonth()-1, s.getDay(), s.getHour(), s.getMinute());
+                        } else {
+                            finalDate = new Date(input.year, input.month-1, input.day, input.hour, input.min);
+                        }
+                    } else {
+                        // For manual mode, findDateFromBazi is needed (simplified here)
+                        const results = findDateFromBazi(input.gz[0], input.gz[1], input.gz[2], input.gz[3], input.gz[4], input.gz[5], input.gz[6], input.gz[7], 2000);
+                        if (results.length > 0) {
+                            finalDate = new Date(results[0].year, results[0].month-1, results[0].day, results[0].hour, 0);
+                        } else {
+                            alert("未找到匹配日期"); return;
+                        }
+                    }
+
+                    // Perform calculation
+                    const resultData = calculateBazi(finalDate, input.gender, null, input.isUnknownHour);
+                    
+                    // Show Result View
+                    document.getElementById('input-view').style.display = 'none';
+                    document.getElementById('result-view').style.display = 'block';
+                    
+                    // Render Results
+                    window.renderPillars(resultData);
+                    window.renderDaYun(resultData);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
