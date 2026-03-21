@@ -1,14 +1,16 @@
 # Ignore everything by default
 /*
 
-# Un-ignore the 4 specific files
-!paipan_node_core.js
-!paipan_node_input.js
-!ARCHITECTURE.md
-!bazi_classes.js
+# Un-ignore the js folder and its contents
+!js/
+!js/**
 
-# Also keep the .gitignore configuration
+# Also keep root configuration and documentation
 !.gitignore
+!sync_to_github.bat
+!README.md
 
-# Keep the sync script locally but you can ignore it from repo if you want
-# !sync_to_github.bat
+# Ignore specific test outputs even if they were in un-ignored folders (though they are not)
+test_output.md
+test_error.log
+*.log
