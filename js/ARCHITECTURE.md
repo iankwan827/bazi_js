@@ -1,5 +1,38 @@
 # 八字命理软件 - 架构需求文档
 
+---
+
+## 速查表（必读）
+
+### 索引对照表
+
+| 名称 | 含义 | 取值范围 |
+|------|------|----------|
+| **pillars数组索引** | pillars[0-7]，定位具体天干或地支 | 0=年干, 1=年支, 2=月干, 3=月支, 4=日干, 5=日支, 6=时干, 7=时支 |
+| **pillar（occurrences）** | occurrences里的pillar值，含义同pillars数组索引 | 0-7 |
+| **柱索引（四柱编号）** | 四柱的编号，用于getPillarAt()等 | 0=年柱, 1=月柱, 2=日柱, 3=时柱 |
+
+### 相邻关系（pillars数组索引）
+
+| 类型 | 相邻对 |
+|------|--------|
+| 同柱相邻 | 0-1, 2-3, 4-5, 6-7 |
+| 隔柱相邻(地支与地支) | 1-3, 3-5, 5-7 |
+
+### 十神occurrences结构
+
+```javascript
+{
+    pillar: 0-7,        // pillars数组索引：0=年干,1=年支,2=月干,3=月支,4=日干,5=日支,6=时干,7=时支
+    occurs: [1,0],     // [天干存在?, 藏干存在?]
+    role: null/'本气'/'中气'/'余气'  // null表示天干
+}
+```
+
+> ⚠️ **修改代码前必查此表！**
+
+---
+
 ## 一、整体架构
 
 ```
@@ -184,6 +217,7 @@ class Gan extends Element {
         this.pillarIndex = pillarIndex;  // 位置索引：0=年干, 2=月干, 4=日干, 6=时干
         this._shishen = null;  // 关联属性：藏干的十神（由BaziContext设置）
         this._hiddenRole = null;  // 关联属性：藏干角色 '本气'、'中气'、'余气'
+        this._zhiName = null;  // 关联属性：藏干所在的地支名称（由BaziContext设置）
 
         // 大运/流年柱开关（用于临柱判断）
         this.isDaYun = 0;    // 1=大运柱，与原局所有柱相邻
@@ -198,6 +232,9 @@ class Gan extends Element {
 
     // 获取藏干角色（关联属性）：'本气'、'中气'、'余气'
     getHiddenRole() { return this._hiddenRole; }
+
+    // 获取藏干所在的地支名称（关联属性）：'子'、'丑'、'寅'...
+    getZhiName() { return this._zhiName; }
 
     // 判断与另一天干是否同性
     isSameYinYang(other) {
@@ -283,10 +320,11 @@ class Zhi extends Element {
         this.type = '地支';
         this.pillarIndex = pillarIndex;  // 位置索引：1=年支, 3=月支, 5=日支, 7=时支
 
-        // 藏干 = 天干数组（关联属性模式：十神通过 _shishen 动态关联，角色通过 _hiddenRole 动态关联）
+        // 藏干 = 天干数组（关联属性模式：十神通过 _shishen 动态关联，角色通过 _hiddenRole 动态关联，地支通过 _zhiName 动态关联）
         this.hiddenGans = data.hiddenStems.map((s, i) => {
             const gan = new Gan(s, -1);
             gan._hiddenRole = i === 0 ? '本气' : (i === 1 ? '中气' : '余气');
+            gan._zhiName = name;  // 藏干所在的地支名称
             return gan;
         });
 
@@ -401,9 +439,26 @@ class Zhi extends Element {
 ```javascript
 class Shishen extends Gan {
     constructor(name, relationToDayMaster) {
-        super(name);
-        this.type = '十神';
+        super(name, -1);  // pillarIndex 固定为 -1，因为十神可能出现在多个位置
         this.relationToDayMaster = relationToDayMaster; // 食神/伤官/正财/偏财/...
+
+        // === 存在状态 ===
+        this.exists = [0, 0];  // [天干存在, 藏干存在]
+        // 判断：[1,0]=虚浮, [0,1]=藏着不透, [1,1]=透干
+
+        // === 出现位置数组 ===
+        this.occurrences = [];
+        // 每个元素: { pillar: 0/1/2/3, occurs: [天干存在, 藏干存在], role: '本气'/'中气'/'余气' }
+        // pillar: 0=年, 1=月, 2=日, 3=时
+        // occurs: [1,0]=天干, [0,1]=藏干
+
+        // === 旺衰和受制状态 ===
+        this.isWang = 0;     // 0=衰, 1=旺
+        this.isShouZhi = 0;  // 0=不受制, 1=受制
+
+        // === 喜用忌闲 ===
+        // 由分析层逻辑判断后赋值：'喜'/'用'/'忌'/'闲'，初始为 null
+        this.xiYong = null;
     }
 
     // 获取十神名称
@@ -412,6 +467,209 @@ class Shishen extends Gan {
     // 是否为日元（元男/元女）
     isDayMaster() {
         return this.relationToDayMaster === '元男' || this.relationToDayMaster === '元女';
+    }
+
+    // 获取透干状态
+    // 返回：0=虚浮(只有天干), 1=藏着不透(只有藏干), 2=透干, -1=不存在
+    getTouGanStatus() {
+        if (this.exists[0] === 1 && this.exists[1] === 0) return 0;  // 虚浮
+        if (this.exists[0] === 0 && this.exists[1] === 1) return 1;  // 藏着不透
+        if (this.exists[0] === 1 && this.exists[1] === 1) return 2;  // 透干
+        return -1;  // 不存在
+    }
+
+    // 根据月令五行计算旺衰
+    // yueLingWx: 月令五行（木/火/土/金/水）
+    // 旺相休囚死中，旺和相算旺(isWang=1)，休囚死算衰(isWang=0)
+    calculateWang(yueLingWx) {
+        const relation = this.getWangRelation(yueLingWx);
+        this.isWang = (relation === '旺' || relation === '相') ? 1 : 0;
+        return this.isWang;
+    }
+}
+
+// =============================================
+// ShishenWangShuaiCalculator（十神旺衰计算器）
+// 独立模块：shishen_wangshuai.js
+// =============================================
+
+class ShishenWangShuaiCalculator {
+    /**
+     * 计算所有十神的旺衰
+     * @param {BaziContext} ctx - 命盘上下文
+     * @param {Object} bodyStrength - 身强身弱结果 { level, score, percentage }
+     *
+     * 【输出属性 - 赋值到 shishen 对象】
+     * 此方法计算以下属性，后续分析模块可直接使用：
+     * - shishen.isWang: 0=衰, 1=旺（通过月令、通根、本气根、中气根判断）
+     * - shishen.isShouZhi: 0=不受制, 1=受制（通过克、冲、刑、合判断）
+     * - shishen.xiYong: '用'/'忌'/'闲'（根据身强身弱判断）
+     */
+    static calculateAll(ctx, bodyStrength) {
+        const yueLingWx = ctx.pillars[3].wx;  // 月令五行
+
+        ctx.shishenResults.forEach(result => {
+            const shishen = result.shishen;
+
+            // 1. 得月令（旺相休囚死）
+            const yueLingWang = shishen.calculateWang(yueLingWx);
+
+            // 2. 本柱通根/禄/刃
+            const benTongGen = this._hasBenTongGen(shishen.name, ctx);
+
+            // 3. 原局本气根数量
+            const benQiRoots = this._countBenQiRoots(shishen.name, ctx);
+
+            // 4. 原局中气根数量
+            const zhongQiRoots = this._countZhongQiRoots(shishen.name, ctx);
+
+            // 综合判断旺衰
+            // 旺的条件：得月令 OR 本柱通根 OR 至少一个本气根 OR 至少两个中气根
+            const isWang = yueLingWang || benTongGen || benQiRoots >= 1 || zhongQiRoots >= 2;
+            shishen.isWang = isWang ? 1 : 0;
+
+            // 计算受制状态
+            shishen.isShouZhi = this._calculateShouZhi(shishen, ctx);
+
+            // 计算喜用忌闲
+            shishen.xiYong = this._calculateXiYong(shishen, bodyStrength);
+        });
+    }
+
+    /**
+     * 判断是否有本柱通根
+     * 本柱通根 = 天干作为本气出现在任何地支的藏干中
+     * @param {string} ganName - 天干名
+     * @param {BaziContext} ctx
+     * @returns {boolean}
+     */
+    static _hasBenTongGen(ganName, ctx) {
+        // 检查原局所有地支的藏干
+        const zhis = ctx.getAllZhis();
+        for (const zhi of zhis) {
+            const mainGan = zhi.getMainStem();
+            if (mainGan && mainGan.name === ganName) return true;
+            const middleGan = zhi.getMiddleStem();
+            if (middleGan && middleGan.name === ganName) return true;
+            const remainderGan = zhi.getRemainderStem();
+            if (remainderGan && remainderGan.name === ganName) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 统计本气根数量
+     * 统计该天干作为本气出现在地支藏干中的次数
+     */
+    static _countBenQiRoots(ganName, ctx) {
+        let count = 0;
+        const zhis = ctx.getAllZhis();
+        for (const zhi of zhis) {
+            const mainGan = zhi.getMainStem();
+            if (mainGan && mainGan.name === ganName) count++;
+        }
+        return count;
+    }
+
+    /**
+     * 统计中气根数量
+     * 统计该天干作为中气出现在地支藏干中的次数
+     */
+    static _countZhongQiRoots(ganName, ctx) {
+        let count = 0;
+        const zhis = ctx.getAllZhis();
+        for (const zhi of zhis) {
+            const middleGan = zhi.getMiddleStem();
+            if (middleGan && middleGan.name === ganName) count++;
+            const remainderGan = zhi.getRemainderStem();
+            if (remainderGan && remainderGan.name === ganName) count++;
+        }
+        return count;
+    }
+
+    /**
+     * 计算受制状态
+     * 制：克、冲、刑、合伴、合化
+     * 受制的逻辑：
+     * - 制：克、冲、刑、合伴、合化
+     * - 情况1：同柱天干克地支（如时干乙木克时支未土）
+     * - 情况2：地支之间的冲、刑、合关系（如年支卯木冲月支酉金）
+     * - 例如：未（土）被时干乙木克，所以未中所有藏干（己、丁、乙）都受制
+     * - 例如：酉（金）被年支卯木冲，所以酉中藏干（辛）受制
+     */
+    static _calculateShouZhi(shishen, ctx) {
+        const shishenName = shishen.name;
+        const zhis = ctx.getAllZhis();
+
+        for (const zhi of zhis) {
+            const hiddenNames = zhi.hiddenGans.map(h => h.name);
+            if (!hiddenNames.includes(shishenName)) continue;
+
+            // 情况1：检查同柱天干是否克该地支
+            const ganPosition = zhi.pillarIndex - 1;
+            if (ganPosition >= 0 && ctx.pillars[ganPosition]) {
+                const gan = ctx.pillars[ganPosition];
+                if (this._isKe(gan.wx, zhi.wx)) return 1;
+            }
+
+            // 情况2：检查其他地支与该地支的冲、刑、合关系
+            for (const otherZhi of zhis) {
+                if (otherZhi.name === zhi.name) continue;
+                if (this._isChong(otherZhi.name, zhi.name)) return 1;
+                if (this._isXing(otherZhi.name, zhi.name)) return 1;
+                if (this._isHe(otherZhi.name, zhi.name)) return 1;
+            }
+        }
+        return 0;
+    }
+
+    static _isKe(keWx, beiWx) {
+        if (keWx === '木' && beiWx === '土') return true;
+        if (keWx === '火' && beiWx === '金') return true;
+        if (keWx === '土' && beiWx === '水') return true;
+        if (keWx === '金' && beiWx === '木') return true;
+        if (keWx === '水' && beiWx === '火') return true;
+        return false;
+    }
+
+    static _isChong(zhi1, zhi2) {
+        const ZHICHONG_TABLE = [['子','午'],['丑','未'],['寅','申'],['卯','酉'],['辰','戌'],['巳','亥']];
+        for (const [a, b] of ZHICHONG_TABLE) {
+            if ((zhi1 === a && zhi2 === b) || (zhi1 === b && zhi2 === a)) return true;
+        }
+        return false;
+    }
+
+    static _isXing(zhi1, zhi2) {
+        const XING_TABLE = [['寅','巳','申'],['丑','戌'],['子','卯']];
+        for (const group of XING_TABLE) {
+            if (group.includes(zhi1) && group.includes(zhi2)) return true;
+        }
+        return false;
+    }
+
+    static _isHe(zhi1, zhi2) {
+        const HE_TABLE = [['子','丑'],['寅','亥'],['卯','戌'],['辰','酉'],['巳','申'],['午','未']];
+        for (const [a, b] of HE_TABLE) {
+            if ((zhi1 === a && zhi2 === b) || (zhi1 === b && zhi2 === a)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 计算喜用忌闲
+     * 身强：官财食伤为用，印比劫为忌
+     * 身弱：印比劫为用，官财食伤为忌
+     */
+    static _calculateXiYong(shishen, bodyStrength) {
+        const shishenName = shishen.getName();
+        const isShenQiang = bodyStrength.level.includes('强');
+        const guanCaiShiShang = ['七杀', '正官', '偏财', '正财', '食神', '伤官'];
+        const yinBiJie = ['偏印', '正印', '比肩', '劫财'];
+
+        if (guanCaiShiShang.includes(shishenName)) return isShenQiang ? '用' : '忌';
+        if (yinBiJie.includes(shishenName)) return isShenQiang ? '忌' : '用';
+        return '闲';
     }
 }
 
@@ -466,7 +724,425 @@ class ShishenCalculator {
         return results;
     }
 }
+
+// =============================================
+// ShishenPingKeCalculator（十神性格计算器）
+// 独立模块：shishen_pingke.js
+// =============================================
+
+/**
+ * 十神性格特征详细表
+ * 根据文档《八字用神与性格特征.md》逐行实现
+ * 每个分类(category)有4种条件组合：
+ * - 用神旺而逢生 → 正面特征
+ * - 忌神弱而受制 → 正面特征
+ * - 用神弱而受制 → 负面特征
+ * - 忌神旺而逢生 → 负面特征
+ */
+const PINGKE_TABLE = {
+    guanSha: {
+        name: '官星',
+        trait: '守法',
+        conditions: [
+            // 用神旺而逢生 → 正面
+            { xiYong: '用', isWang: true, isFengSheng: true, description: '刚直不阿、秉公执法、责任心强、锐意进取、具有君子之风' },
+            // 忌神弱而受制 → 正面
+            { xiYong: '忌', isWang: false, isShouZhi: true, description: '刚直不阿、秉公执法、责任心强、锐意进取、具有君子之风' },
+            // 用神弱而受制 → 负面
+            { xiYong: '用', isWang: false, isShouZhi: true, description: '行为不轨、违法之徒、不思进取、顶撞领导、当为小人' },
+            // 忌神旺而逢生 → 负面
+            { xiYong: '忌', isWang: true, isFengSheng: true, description: '行为不轨、违法之徒、不思进取、顶撞领导、当为小人' }
+        ]
+    },
+    yin: {
+        name: '印星',
+        trait: '仁慈',
+        conditions: [
+            { xiYong: '用', isWang: true, isFengSheng: true, description: '仁慈宽厚、宽以待人、体恤亲朋、智力超群、文才卓然' },
+            { xiYong: '忌', isWang: false, isShouZhi: true, description: '仁慈宽厚、宽以待人、体恤亲朋、智力超群、文才卓然' },
+            { xiYong: '用', isWang: false, isShouZhi: true, description: '心胸狭窄、做事狠毒、目光短浅、性格多疑、感情用事、傻大粗黑' },
+            { xiYong: '忌', isWang: true, isFengSheng: true, description: '心胸狭窄、做事狠毒、目光短浅、性格多疑、感情用事、傻大粗黑' }
+        ]
+    },
+    cai: {
+        name: '财星',
+        trait: '勤勉',
+        conditions: [
+            { xiYong: '用', isWang: true, isFengSheng: true, description: '勤勉能干、性格温和、古道热肠、仗义疏财、思想纯正' },
+            { xiYong: '忌', isWang: false, isShouZhi: true, description: '勤勉能干、性格温和、古道热肠、仗义疏财、思想纯正' },
+            { xiYong: '用', isWang: false, isShouZhi: true, description: '懒惰、小气吝啬、头脑僵化、性格暴躁、喜信谗言' },
+            { xiYong: '忌', isWang: true, isFengSheng: true, description: '懒惰、小气吝啬、头脑僵化、性格暴躁、喜信谗言' }
+        ]
+    },
+    shiShang: {
+        name: '食伤',
+        trait: '才华',
+        conditions: [
+            { xiYong: '用', isWang: true, isFengSheng: true, description: '气质高雅、思想脱俗、反应灵敏、风流潇洒、才华横溢、聪明伶俐、能言善道、多才多艺、适应力强、有艺术天赋' },
+            { xiYong: '忌', isWang: false, isShouZhi: true, description: '气质高雅、思想脱俗、反应灵敏、风流潇洒、才华横溢、聪明伶俐、能言善道、多才多艺、适应力强、有艺术天赋' },
+            { xiYong: '用', isWang: false, isShouZhi: true, description: '自命不凡、郁郁寡欢、喜欢空想、行为诡秘、易遭挫折' },
+            { xiYong: '忌', isWang: true, isFengSheng: true, description: '自命不凡、郁郁寡欢、喜欢空想、行为诡秘、易遭挫折' }
+        ]
+    },
+    biJie: {
+        name: '比劫',
+        trait: '义气',
+        conditions: [
+            { xiYong: '用', isWang: true, isFengSheng: true, description: '意志坚定、为人豪惠、事直自重、邻里友好、内外团结' },
+            { xiYong: '忌', isWang: false, isShouZhi: true, description: '意志坚定、为人豪惠、事直自重、邻里友好、内外团结' },
+            { xiYong: '用', isWang: false, isShouZhi: true, description: '刻板固执、自以为是、兄弟失合、一生操劳' },
+            { xiYong: '忌', isWang: true, isFengSheng: true, description: '刻板固执、自以为是、兄弟失合、一生操劳' }
+        ]
+    }
+};
+
+// 十神分类映射
+const SHISHEN_CATEGORY = {
+    guanSha: ['七杀', '正官'],
+    yin: ['偏印', '正印'],
+    cai: ['偏财', '正财'],
+    shiShang: ['食神', '伤官'],
+    biJie: ['比肩', '劫财']
+};
+
+class ShishenPingKeCalculator {
+    /**
+     * 计算所有十神的性格特征
+     * @param {BaziContext} ctx - 命盘上下文
+     * @returns {Array} 性格特征数组
+     *
+     * 【依赖属性 - 由 ShishenWangShuaiCalculator.calculateAll() 预先赋值】
+     * - shishen.xiYong: '用'/'忌' - 用神/忌神
+     * - shishen.isWang: 0/1 - 旺/衰
+     * - shishen.isShouZhi: 0/1 - 受制/不受制
+     *
+     * 【本方法计算】
+     * - isFengSheng: 通过 _checkFengSheng() 判断是否逢生
+     */
+    static calculateAll(ctx) {
+        const results = [];
+
+        ctx.shishenResults.forEach(result => {
+            const shishen = result.shishen;
+            const shishenName = shishen.getName();
+            // 直接使用 WangShuaiCalculator 已计算好的属性
+            const xiYong = shishen.xiYong;
+            const isWang = shishen.isWang === 1;
+            const isShouZhi = shishen.isShouZhi === 1;
+
+            // 获取十神所在的天干位置，计算逢生
+            const ganPosition = this._getGanPosition(result);
+            const isFengSheng = this._checkFengSheng(ganPosition, ctx);
+
+            // 判断性格特征
+            const category = this._getCategory(shishenName);
+            if (category) {
+                const pingKe = this._determinePingKe(category, xiYong, isWang, isShouZhi, isFengSheng);
+                results.push({
+                    shishen: shishenName,
+                    category: PINGKE_TABLE[category].name,
+                    trait: PINGKE_TABLE[category].trait,
+                    isWang: isWang,
+                    isShouZhi: isShouZhi,
+                    isFengSheng: isFengSheng,
+                    pingKe: pingKe
+                });
+            }
+        });
+
+        return results;
+    }
+
+    /**
+     * 从 shishenResult 获取天干位置
+     * @param {Object} result - shishenResult 条目
+     * @returns {number} 天干位置 (0-7)
+     */
+    static _getGanPosition(result) {
+        // 找到第一个在天干中出现的 occurrence
+        for (const occ of result.occurrences) {
+            if (occ.occurs[0] === 1) {
+                // pillar: 0=年, 1=月, 2=日, 3=时
+                // 对应的天干位置: pillar * 2
+                return occ.pillar * 2;
+            }
+        }
+        // 如果没有天干出现，返回第一个藏干的位置
+        if (result.occurrences.length > 0) {
+            const occ = result.occurrences[0];
+            // pillar: 0=年, 1=月, 2=日, 3=时
+            // 对应的地支位置: pillar * 2 + 1
+            return occ.pillar * 2 + 1;
+        }
+        return -1;
+    }
+
+    /**
+     * 检查十神是否逢生
+     * 逢生：相邻天干中有相生的关系（木生火、火生土等通过五行生克判断）
+     * @param {number} ganIndex - 天干索引
+     * @param {BaziContext} ctx
+     * @returns {boolean}
+     */
+    static _checkFengSheng(ganIndex, ctx) {
+        // 获取该十神所在的所有位置（天干位置 + 藏干所在的地支位置）
+        const positions = this._getShishenPositions(ganIndex, ctx);
+        if (positions.length === 0) return false;
+
+        // 检查所有位置是否有逢生关系
+        for (const pos of positions) {
+            const pillar = ctx.pillars[pos];
+            if (!pillar) continue;
+
+            // 获取该位置的相邻位置
+            const adjacentPositions = pillar.getAdjacentPositions();
+
+            for (const adjPos of adjacentPositions) {
+                const other = ctx.pillars[adjPos];
+                if (!other || other.type !== '天干') continue;
+
+                // 检查 other 是否生 pillar（相生关系）
+                const relation = other.getRelationTo(pillar);
+                if (relation === '生' || relation === '被生') {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 获取十神所在的所有位置
+     * @param {number} ganIndex - 天干索引
+     * @param {BaziContext} ctx
+     * @returns {Array} 位置数组
+     */
+    static _getShishenPositions(ganIndex, ctx) {
+        const ganName = ctx.pillars[ganIndex]?.name;
+        if (!ganName) return [ganIndex];
+
+        const positions = [ganIndex];
+
+        // 检查该天干是否作为藏干出现在某个地支中
+        for (let i = 0; i < ctx.pillars.length; i++) {
+            const pillar = ctx.pillars[i];
+            if (pillar.type !== '地支') continue;
+
+            for (const hiddenGan of pillar.hiddenGans) {
+                if (hiddenGan.name === ganName) {
+                    // 藏干所在的位置是该地支的 pillarIndex
+                    positions.push(pillar.pillarIndex);
+                }
+            }
+        }
+
+        return positions;
+    }
+
+    /**
+     * 获取十神分类
+     * @param {string} shishenName
+     * @returns {string|null}
+     */
+    static _getCategory(shishenName) {
+        for (const [key, names] of Object.entries(SHISHEN_CATEGORY)) {
+            if (names.includes(shishenName)) {
+                return key;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 判断性格特征
+     * 只匹配条件中明确指定的字段，忽略其他字段
+     * 例如："旺而逢生"只检查isWang和isFengSheng，不检查isShouZhi
+     * @param {string} category - 十神分类
+     * @param {string} xiYong - '用'/'忌'
+     * @param {boolean} isWang - 是否旺
+     * @param {boolean} isShouZhi - 是否受制
+     * @param {boolean} isFengSheng - 是否逢生
+     * @returns {Object} { isPositive: boolean, description: string }
+     */
+    static _determinePingKe(category, xiYong, isWang, isShouZhi, isFengSheng) {
+        const info = PINGKE_TABLE[category];
+        if (!info || !info.conditions) {
+            return { isPositive: null, description: '' };
+        }
+
+        // 只匹配条件中明确指定的字段
+        for (const cond of info.conditions) {
+            // xiYong 必须匹配
+            if (cond.xiYong !== xiYong) continue;
+
+            // 检查条件中定义的其他字段
+            if (cond.hasOwnProperty('isWang') && cond.isWang !== isWang) continue;
+            if (cond.hasOwnProperty('isShouZhi') && cond.isShouZhi !== isShouZhi) continue;
+            if (cond.hasOwnProperty('isFengSheng') && cond.isFengSheng !== isFengSheng) continue;
+
+            // 所有条件中定义的字段都匹配
+            return { isPositive: cond.isPositive, description: cond.description };
+        }
+
+        return { isPositive: null, description: '' };
+    }
 ```
+
+// =============================================
+// ShishenGeshiCalculator（十神格局计算器）
+// 独立模块：shishen_geshi.js
+// =============================================
+
+/**
+ * 十神格局分析
+ * 计算财官印相生、比肩食伤生财等格局
+ */
+class ShishenGeshiCalculator {
+    /**
+     * 计算十神格局
+     * @param {BaziContext} ctx - 命盘上下文
+     * @returns {Object} 格局分析结果
+     *
+     * 【输出属性】
+     * - patterns: 存在的格局列表 ['财官印相生', '比肩食伤生财']
+     * - caiGuanYin: 财官印相生结果 { matched, s1, s2, s3, reason }
+     * - biJieShiShangCai: 比肩食伤生财结果 { matched, s1, s2, s3, reason }
+     *
+     * 【依赖属性 - 无需预先计算，直接使用 shishen.name 和 shishen.wx】
+     */
+    static calculate(ctx) {
+        const result = {
+            patterns: [],
+            caiGuanYin: null,
+            biJieShiShangCai: null,
+            details: []
+        };
+
+        // 查找各类十神
+        const cai = this._findShishen(ctx, ['偏财', '正财']);
+        const guan = this._findShishen(ctx, ['七杀', '正官']);
+        const yin = this._findShishen(ctx, ['偏印', '正印']);
+        const biJie = this._findShishen(ctx, ['比肩', '劫财']);
+        const shiShang = this._findShishen(ctx, ['食神', '伤官']);
+
+        // 判断财官印相生：财→官→印
+        const caiGuanYinChain = this._checkXiangShengChain(cai, guan, yin);
+        if (caiGuanYinChain.matched) {
+            result.patterns.push('财官印相生');
+            result.caiGuanYin = caiGuanYinChain;
+        }
+
+        // 判断比肩食伤生财：比劫→食伤→财
+        const biJieShiShangCaiChain = this._checkXiangShengChain(biJie, shiShang, cai);
+        if (biJieShiShangCaiChain.matched) {
+            result.patterns.push('比肩食伤生财');
+            result.biJieShiShangCai = biJieShiShangCaiChain;
+        }
+
+        result.details.push(caiGuanYinChain);
+        result.details.push(biJieShiShangCaiChain);
+
+        return result;
+    }
+
+    /**
+     * 查找指定类型的十神
+     */
+    static _findShishen(ctx, names) {
+        return ctx.shishenResults.find(r => names.includes(r.shishen.name)) || null;
+    }
+
+    /**
+     * 检查三神是否形成相生链条
+     * 相生关系：s1生s2，s2生s3
+     * @param {Object} s1 - 生者
+     * @param {Object} s2 - 被生者
+     * @param {Object} s3 - 被生者
+     * @returns {Object} { matched: boolean, s1, s2, s3, reason }
+     */
+    static _checkXiangShengChain(s1, s2, s3) {
+        if (!s1 || !s2 || !s3) {
+            return { matched: false, s1: null, s2: null, s3: null, reason: '缺少必要十神' };
+        }
+
+        const shishen1 = s1.shishen;
+        const shishen2 = s2.shishen;
+        const shishen3 = s3.shishen;
+
+        // 检查 s1 → s2 相生
+        const relation1to2 = shishen1.getRelationTo(shishen2);
+        // 检查 s2 → s3 相生
+        const relation2to3 = shishen2.getRelationTo(shishen3);
+
+        // 相生：'生' 或 '被生' 都可以
+        const s1ToS2 = relation1to2 === '生' || relation1to2 === '被生';
+        const s2ToS3 = relation2to3 === '生' || relation2to3 === '被生';
+
+        if (s1ToS2 && s2ToS3) {
+            const chain = `${shishen1.name}→${shishen2.name}→${shishen3.name}`;
+            return {
+                matched: true,
+                s1: shishen1,
+                s2: shishen2,
+                s3: shishen3,
+                reason: `形成${chain}相生链条`
+            };
+        }
+
+        let reason = '';
+        if (!s1ToS2) {
+            reason = `${shishen1.name}不生${shishen2.name}（关系：${relation1to2 || '无'}）`;
+        } else {
+            reason = `${shishen2.name}不生${shishen3.name}（关系：${relation2to3 || '无'}）`;
+        }
+
+        return { matched: false, s1: shishen1, s2: shishen2, s3: shishen3, reason };
+    }
+
+    // =============================================
+    // 六柱格局计算（大运+流年）
+    // =============================================
+
+    /**
+     * 计算六柱格局（原局四柱 + 当前大运 + 当前流年）
+     * 大运和流年作为独立柱加入，与原局所有柱都相邻
+     * @param {BaziContext} ctx - 命盘上下文
+     * @param {Object} currentDaYun - 当前大运数据（来自daYunList）
+     * @param {Object} currentLiuNian - 当前流年数据（来自daYun.liuNian）
+     * @returns {Object} 格局分析结果（格式同calculate）
+     */
+    static calculateSixPillars(ctx, currentDaYun, currentLiuNian) { ... }
+
+    /**
+     * 在六柱中查找指定十神（包含大运和流年天干）
+     * @param {Array} sixPillars - 六柱数组
+     * @param {Array} names - 十神名称数组
+     * @param {Array} shishenResults - 原局shishenResults
+     * @returns {Object|null}
+     */
+    static _findShishenInSixPillars(sixPillars, names, shishenResults) { ... }
+
+    /**
+     * 检查六柱中的三神是否形成相生链条
+     * @param {Object} s1 - 生者
+     * @param {Object} s2 - 被生者
+     * @param {Object} s3 - 被生者
+     * @param {Array} sixPillars - 六柱数组
+     * @returns {Object}
+     */
+    static _checkSixPillarChain(s1, s2, s3, sixPillars) { ... }
+
+    /**
+     * 判断六柱中两个位置是否相邻
+     * 大运(8,9)和流年(10,11)与原局所有柱(0-7)都相邻
+     * @param {number} p1 - 位置索引
+     * @param {number} p2 - 位置索引
+     * @param {Array} sixPillars - 六柱数组
+     * @returns {boolean}
+     */
+    static _isAdjacentInSixPillars(p1, p2, sixPillars) { ... }
+}
 
 ---
 
@@ -794,8 +1470,184 @@ console.log(ctx.dayMaster.isYang());     // false (辛为阴金)
 
 ---
 
+## 五、输出规范
+
+test/test_bazi_classes.js 测试输出规范如下：
+
+### 1. 四柱排盘
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ 【四柱排盘】                                                  │
+├───────────────────────────────────────────────────────────────┤
+│ 年柱: {gan}{zhi} ({十神名称})
+│         藏干: {藏干1}({十神1}), {藏干2}({十神2}), {藏干3}({十神3})
+│ 月柱: {gan}{zhi} ({十神名称})
+│         藏干: ...
+│ 日柱: {gan}{zhi} ({十神名称})  ← 日干为日元则十神为空
+│         藏干: ...
+│ 时柱: {gan}{zhi} ({十神名称})
+│         藏干: ...
+└───────────────────────────────────────────────────────────────┘
+```
+
+**字段说明：**
+- `{十神名称}`：主天干的十神，通过 `ctx.getShishenAt(i)` 获取
+- `藏干`：地支藏干列表，每条格式 `{藏干名}({十神名})`
+  - 十神名通过 `hiddenGan.getShishen()` 获取
+- 日柱的十神为空是正确行为（日干是日元，不是十神）
+
+### 2. 大运流年
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ 【大运流年】                                                  │
+├───────────────────────────────────────────────────────────────┤
+│ 当前大运: {ganZhi} ({十神})
+│ 年龄: {startAge}-{endAge}岁
+│ 起始年: {startYear}年
+│ 当前流年: {year}年({age}岁) {ganZhi} ({十神})
+│ 共 {count} 步大运
+└───────────────────────────────────────────────────────────────┘
+```
+
+### 3. 基本信息
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ 【基本信息】                                                  │
+├───────────────────────────────────────────────────────────────┤
+│ 日主: {gan} ({wx}, {yy}性)
+│ 身强身弱: {level} ({percentage}%)
+└───────────────────────────────────────────────────────────────┘
+```
+
+**字段说明：**
+- `{gan}`：日干名称
+- `{wx}`：日干五行
+- `{yy}`：阴阳性（阳/阴）
+- `{level}`：身强/身弱/中和
+- `{percentage}`：身强比例（0-100%）
+
+### 4. 十神旺衰受制
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ 【十神旺衰受制】                                              │
+├───────────────────────────────────────────────────────────────┤
+│ {gan}: {shishen} | 旺衰={旺衰} | {受制} | 喜忌={喜忌}
+│ ...
+└───────────────────────────────────────────────────────────────┘
+```
+
+**字段说明：**
+- `旺衰`：旺=isWang===1，衰=isWang===0
+- `受制`：受制=isShouZhi===1，不受制=isShouZhi===0
+- `喜忌`：用/忌/喜/闲（xiYong字段值）
+
+### 5. 性格特征
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ 【性格特征】                                                  │
+├───────────────────────────────────────────────────────────────┤
+│ {十神}（{分类}）: {✓正面/✗负面/○中性}
+│   {描述}
+│ ...
+└───────────────────────────────────────────────────────────────┘
+```
+
+**字段说明：**
+- `{分类}`：官星/印星/财星/食伤/比劫
+- `✓正面`：isPositive===true
+- `✗负面`：isPositive===false
+- `○中性`：isPositive===null
+- `{描述}`：PINGKE_TABLE中matched条件的description字段
+
+### 6. 十神格局
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│ 【十神格局】                                                  │
+├───────────────────────────────────────────────────────────────┤
+│ [四柱格局]
+│ ★ {格局名1}
+│ ★ {格局名2}
+│ ...
+│
+│ 格局明细:
+│ 1. 财官印相生（财→官→印）:
+│    ★ 匹配! {s1}→{s2}→{s3}
+│    {reason}
+│ 或
+│    ✗ 未形成 - {reason}
+│
+│ 2. 比肩食伤生财（比劫→食伤→财）:
+│    ★ 匹配! {s1}→{s2}→{s3}
+│    {reason}
+│ 或
+│    ✗ 未形成 - {reason}
+│
+│ [六柱格局] (四柱+大运+流年)
+│ ★ {格局名1}
+│ ★ {格局名2}
+│ ...
+│
+│ 格局明细:
+│ 1. 财官印相生（财→官→印）:
+│    ★ 匹配! {s1}→{s2}→{s3}
+│    {reason}（六柱相邻）
+│ 或
+│    ✗ 未形成 - {reason}
+│
+│ 2. 比肩食伤生财（比劫→食伤→财）:
+│    ★ 匹配! {s1}→{s2}→{s3}
+│    {reason}（六柱相邻）
+│ 或
+│    ✗ 未形成 - {reason}
+└───────────────────────────────────────────────────────────────┘
+```
+
+**字段说明：**
+- **四柱格局**：原局四柱的格局分析
+- **六柱格局**：四柱+当前大运+当前流年的格局分析
+- 格局列表：所有matched的格局
+- 每种格局明细：匹配时显示★+十神链+原因，未匹配时显示✗+原因
+- 六柱格局原因中会标注"（六柱相邻）"以区分四柱格局的"（位置相邻）"
+
+### 验证要点
+
+1. **四柱排盘**：
+   - 年/月/时柱的十神不应为空（日柱可以为空）
+   - 藏干十神应正确显示（如乙(偏财)）
+   - 同一十神在不同柱出现只显示一次
+
+2. **十神旺衰受制**：
+   - 每个十神应出现一次
+   - 旺衰、受制、喜忌应有明确值
+
+3. **性格特征**：
+   - 应有4种十神类型（官/印/财/食伤/比劫中实际存在的）
+   - 每种应有正面/负面/中性判定和描述
+
+4. **十神格局**：
+   - 财官印相生和比肩食伤生财应至少有一个匹配或不匹配的原因
+   - 六柱格局可能与四柱格局不同（大运/流年引入新十神可能形成新格局）
+
+---
+
 ## 版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v0.1 | 2026-03-19 | 初始架构文档 - 数据层 |
+| v0.2 | 2026-03-21 | 新增 ShishenWangShuaiCalculator 类，实现十神旺衰判断逻辑（isWang、isShouZhi、xiYong） |
+| v0.3 | 2026-03-21 | 新增 ShishenPingKeCalculator 类，实现十神性格特征判断 |
+| v0.4 | 2026-03-21 | 完善 ShishenPingKeCalculator 文档，更新 PINGKE_TABLE 结构（5分类×4条件），添加逢生判断逻辑(_checkFengSheng)、受制判断调用说明 |
+| v0.5 | 2026-03-21 | 明确 ShishenWangShuaiCalculator 与 ShishenPingKeCalculator 的属性复用关系（xiYong/isWang/isShouZhi 由前者计算，PingKe只计算isFengSheng） |
+| v0.6 | 2026-03-21 | 新增 ShishenGeshiCalculator 类，计算财官印相生、比肩食伤生财格局 |
+| v0.7 | 2026-03-21 | 添加速查表（pillar索引对照、相邻关系、occurrences结构）；修复相邻判断逻辑（pillar是pillars数组索引0-7，非柱索引0-3）；只计算天干和本气判断格局 |
+| v0.8 | 2026-03-21 | 修复性格匹配逻辑：PINGKE_TABLE中"旺而逢生"等条件不检测isShouZhi；_determinePingKe改用hasOwnProperty只匹配条件中定义的字段 |
+| v0.9 | 2026-03-21 | 新增输出规范文档（五），定义test_bazi_classes.js完整输出格式及验证要点 |
+| v0.10 | 2026-03-21 | 新增六柱格局计算（calculateSixPillars）：四柱+大运+流年，大运/流年与原局所有柱相邻 |
+| v0.11 | 2026-03-21 | 修复occurrences.pillar记录错误：藏干的pillar原错误记录为柱索引(0-3)，应改为pillars数组索引(1,3,5,7)；相邻关系恢复为同柱相邻(0-1,2-3,4-5,6-7)和隔柱相邻(1-3,3-5,5-7) |

@@ -110,12 +110,16 @@ class Gan extends Element {
         this.pillarIndex = pillarIndex;  // 0=年干, 2=月干, 4=日干, 6=时干
         this._shishen = null;  // 关联属性：藏干的十神
         this._hiddenRole = null;  // 关联属性：藏干角色 '本气'、'中气'、'余气'
+        this._zhiName = null;  // 关联属性：藏干所在的地支名称
         this.isDaYun = 0;  // 大运柱开关：1=大运柱，与原局所有柱相邻
         this.isLiuNian = 0;  // 流年柱开关：1=流年柱，与原局所有柱相邻
     }
 
     // 获取藏干角色（关联属性）
     getHiddenRole() { return this._hiddenRole; }
+
+    // 获取藏干所在的地支名称（关联属性）
+    getZhiName() { return this._zhiName; }
 
     getOrder() { return this.order; }
 
@@ -179,10 +183,11 @@ class Zhi extends Element {
         this.type = '地支';
         this.pillarIndex = pillarIndex;  // 1=年支, 3=月支, 5=日支, 7=时支
 
-        // 藏干 = 天干数组（关联属性模式：十神通过 _shishen 动态关联，角色通过 _hiddenRole 动态关联）
+        // 藏干 = 天干数组（关联属性模式：十神通过 _shishen 动态关联，角色通过 _hiddenRole 动态关联，地支通过 _zhiName 动态关联）
         this.hiddenGans = data.hiddenStems.map((s, i) => {
             const gan = new Gan(s, -1);
             gan._hiddenRole = i === 0 ? '本气' : (i === 1 ? '中气' : '余气');
+            gan._zhiName = name;  // 藏干所在的地支名称
             return gan;
         });
 
@@ -269,14 +274,48 @@ class Zhi extends Element {
 // =============================================
 
 class Shishen extends Gan {
-    constructor(name, pillarIndex, relationToDayMaster) {
-        super(name, pillarIndex);
-        this.type = '十神';
+    constructor(name, relationToDayMaster) {
+        super(name, -1);  // pillarIndex 固定为 -1，因为十神可能出现在多个位置
         this.relationToDayMaster = relationToDayMaster;
+
+        // [天干存在, 藏干存在]
+        // 判断：[1,0]=虚浮, [0,1]=藏着不透, [1,1]=透干
+        this.exists = [0, 0];
+
+        // 出现位置数组
+        // 每个元素: { pillar: 0/1/2/3, occurs: [天干存在, 藏干存在], role: '本气'/'中气'/'余气' }
+        // pillar: 0=年, 1=月, 2=日, 3=时
+        // occurs: [1,0]=天干, [0,1]=藏干
+        this.occurrences = [];
+
+        // 旺衰和受制状态
+        this.isWang = 0;     // 0=衰, 1=旺
+        this.isShouZhi = 0;  // 0=不受制, 1=受制
+
+        // 喜用忌闲（由分析层逻辑判断后赋值）
+        this.xiYong = null;  // '喜'/'用'/'忌'/'闲'
     }
 
     getName() { return this.relationToDayMaster; }
     isDayMaster() { return this.relationToDayMaster === '元男' || this.relationToDayMaster === '元女'; }
+
+    // 获取透干状态
+    // 返回：0=虚浮(只有天干), 1=藏着不透(只有藏干), 2=透干, -1=不存在
+    getTouGanStatus() {
+        if (this.exists[0] === 1 && this.exists[1] === 0) return 0;  // 虚浮
+        if (this.exists[0] === 0 && this.exists[1] === 1) return 1;  // 藏着不透
+        if (this.exists[0] === 1 && this.exists[1] === 1) return 2;  // 透干
+        return -1;  // 不存在
+    }
+
+    // 根据月令五行计算旺衰
+    // yueLingWx: 月令五行（木/火/土/金/水）
+    // 旺相休囚死中，旺和相算旺(isWang=1)，休囚死算衰(isWang=0)
+    calculateWang(yueLingWx) {
+        const relation = this.getWangRelation(yueLingWx);
+        this.isWang = (relation === '旺' || relation === '相') ? 1 : 0;
+        return this.isWang;
+    }
 }
 
 // =============================================
@@ -323,18 +362,76 @@ class ShishenCalculator {
         const dayMaster = ctx.dayMaster;
         const results = [];
 
-        // 从 processedPillars 获取十神（排盘已经算好了）
-        ctx.getAllGans().forEach((gan, idx) => {
-            // 使用排盘计算好的十神
-            const tenGod = processedPillars[idx].tenGod || '';
-            const shishen = new Shishen(gan.name, gan.pillarIndex, tenGod);
+        // Map: 十神名称 -> { shishen: Shishen, occurrences: [], exists: [0, 0] }
+        const shishenMap = new Map();
 
+        // 遍历天干（年干、月干、日干、时干）
+        ctx.getAllGans().forEach((gan, pillarIdx) => {
+            const tenGod = processedPillars[pillarIdx].tenGod || '';
+            // 跳过元男/元女（日干自己，不是十神）
+            if (!tenGod || tenGod === '元男' || tenGod === '元女') return;
+
+            if (!shishenMap.has(tenGod)) {
+                shishenMap.set(tenGod, {
+                    ganName: gan.name,
+                    shishen: new Shishen(gan.name, tenGod),
+                    occurrences: []
+                });
+            }
+
+            const entry = shishenMap.get(tenGod);
+            // 天干出现
+            entry.shishen.exists[0] = 1;
+            // 添加 occurrence
+            entry.shishen.occurrences.push({
+                pillar: pillarIdx,  // 0=年, 1=月, 2=日, 3=时
+                occurs: [1, 0],  // 天干
+                role: null
+            });
+        });
+
+        // 遍历藏干
+        const zhiIndices = [1, 3, 5, 7];  // 年支、月支、日支、时支
+        zhiIndices.forEach((zhiIdx) => {
+            const zhi = ctx.pillars[zhiIdx];
+
+            zhi.hiddenGans.forEach((hiddenGan) => {
+                const tenGod = hiddenGan.getShishen();
+                if (!tenGod) return;
+
+                if (!shishenMap.has(tenGod)) {
+                    shishenMap.set(tenGod, {
+                        ganName: hiddenGan.name,
+                        shishen: new Shishen(hiddenGan.name, tenGod),
+                        occurrences: []
+                    });
+                }
+
+                const entry = shishenMap.get(tenGod);
+                // 藏干出现
+                entry.shishen.exists[1] = 1;
+                // 添加 occurrence
+                entry.shishen.occurrences.push({
+                    pillar: zhiIdx,  // pillars数组索引: 1=年支, 3=月支, 5=日支, 7=时支
+                    occurs: [0, 1],  // 藏干
+                    role: hiddenGan.getHiddenRole()  // 本气/中气/余气
+                });
+            });
+        });
+
+        // 计算所有十神的旺衰（根据月令）
+        const yueLingWx = ctx.pillars[3].wx;  // 月支的五行就是月令
+        shishenMap.forEach((entry) => {
+            entry.shishen.calculateWang(yueLingWx);
+        });
+
+        // 转换为结果数组
+        shishenMap.forEach((entry) => {
             results.push({
-                index: idx,
-                gan: gan,
-                shishen: shishen,
-                pillar: idx,
-                isDayMaster: idx === 2
+                ganName: entry.ganName,
+                shishen: entry.shishen,
+                occurrences: entry.shishen.occurrences,
+                exists: entry.shishen.exists
             });
         });
 
@@ -520,7 +617,11 @@ class BaziContext {
     }
 
     getShishenAt(index) {
-        return this.shishenResults.find(r => r.index === index);
+        // index is 0-3 representing 年/月/日/时 pillar
+        // Find shishen result that has a main stem (天干, occurs[0]=1) at this pillar
+        return this.shishenResults.find(r =>
+            r.occurrences.some(o => o.pillar === index && o.occurs[0] === 1)
+        );
     }
 
     getGodByIndex(pillarIndex) {
@@ -555,12 +656,10 @@ class BaziContext {
             daYunList: this.daYunList,
             currentDaYun: this.currentDaYun,
             shishen: this.shishenResults.map(r => ({
-                pillar: ['年', '月', '日', '时'][r.pillar],
-                pillarIndex: r.gan.pillarIndex,
-                gan: r.gan.name,
-                ganWx: r.gan.wx,
+                gan: r.ganName,
                 shishen: r.shishen.getName(),
-                isDayMaster: r.isDayMaster
+                exists: r.exists,
+                occurrences: r.occurrences
             }))
         };
     }

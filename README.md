@@ -8,6 +8,8 @@
   - `paipan_node_core.js`: Node.js 环境下的排盘核心。
   - `paipan_node_input.js`: Node.js 环境下的输入处理。
   - `bazi_classes.js`: 八字对象类定义。
+  - `shishen_wangshuai.js`: 十神旺衰判断逻辑。
+  - `shishen_pingke.js`: 十神性格特征判断。
   - `ARCHITECTURE.md`: 核心架构说明。
 - **test/**: 存放本地测试用的 HTML 页面和测试脚本（不参与同步）。
   - `index.html`: 浏览器演示页面。
