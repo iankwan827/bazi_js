@@ -412,9 +412,10 @@ class ShishenCalculator {
         });
 
         // 遍历藏干
-        zhis.forEach((zhi, zhiIdx) => {
+        zhis.forEach((zhi, idx) => {
             // 设置藏干十神
-            const hiddenData = processedPillars[zhiIdx].hidden || [];
+            // zhi.pillarIndex 是实际位置 (1=年支, 3=月支, 5=日支, 7=时支)
+            const hiddenData = processedPillars[idx].hidden || [];
             zhi.setupHiddenShishen(hiddenData);
 
             zhi.hiddenGans.forEach((hiddenGan) => {
