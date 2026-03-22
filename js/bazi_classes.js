@@ -4,13 +4,10 @@
  */
 
 // =============================================
-// 常量定义
+// 常量定义（保留用于数据表）
 // =============================================
 
 const WX = { JIN: '金', MU: '木', SHUI: '水', HUO: '火', TU: '土' };
-const WX_ORDER = ['木', '火', '土', '金', '水'];
-const WX_SHENG_ORDER = ['金', '水', '木', '火', '土'];
-const WX_KE_ORDER = ['金', '木', '土', '水', '火'];
 
 const GAN_MAP = {
     '甲': { wx: '木', yinyang: '阳', order: 1 },
@@ -45,6 +42,11 @@ const ZHI_MAP = {
 // =============================================
 
 class Element {
+    // 五行属性（静态）
+    static WX_ORDER = ['木', '火', '土', '金', '水'];         // 旺相休囚死顺序
+    static WX_SHENG_ORDER = ['金', '水', '木', '火', '土'];   // 相生顺序：金生水、水生木、木生火、火生土、土生金
+    static WX_KE_ORDER = ['金', '木', '土', '水', '火'];     // 相克顺序：金克木、木克土、土克水、水克火、火克金
+
     constructor(name, wx, yinyang) {
         this.name = name;
         this.wx = wx;
@@ -58,37 +60,37 @@ class Element {
     getRelationTo(other) {
         if (this.wx === other.wx) return '同';
 
-        const shengIdx = WX_SHENG_ORDER.indexOf(this.wx);
+        const shengIdx = Element.WX_SHENG_ORDER.indexOf(this.wx);
         // 检查 this 生 other
-        if (WX_SHENG_ORDER[(shengIdx + 1) % 5] === other.wx) return '生';
-        if (WX_SHENG_ORDER[(shengIdx + 2) % 5] === other.wx) return '生';
+        if (Element.WX_SHENG_ORDER[(shengIdx + 1) % 5] === other.wx) return '生';
+        if (Element.WX_SHENG_ORDER[(shengIdx + 2) % 5] === other.wx) return '生';
 
         // 检查 other 生 this（我被生）
-        const otherShengIdx = WX_SHENG_ORDER.indexOf(other.wx);
-        if (WX_SHENG_ORDER[(otherShengIdx + 1) % 5] === this.wx) return '被生';
-        if (WX_SHENG_ORDER[(otherShengIdx + 2) % 5] === this.wx) return '被生';
+        const otherShengIdx = Element.WX_SHENG_ORDER.indexOf(other.wx);
+        if (Element.WX_SHENG_ORDER[(otherShengIdx + 1) % 5] === this.wx) return '被生';
+        if (Element.WX_SHENG_ORDER[(otherShengIdx + 2) % 5] === this.wx) return '被生';
 
-        const keIdx = WX_KE_ORDER.indexOf(this.wx);
+        const keIdx = Element.WX_KE_ORDER.indexOf(this.wx);
         // 检查 this 克 other
-        if (WX_KE_ORDER[(keIdx + 1) % 5] === other.wx) return '克';
+        if (Element.WX_KE_ORDER[(keIdx + 1) % 5] === other.wx) return '克';
 
         // 检查 other 克 this（我被克）
-        const otherKeIdx = WX_KE_ORDER.indexOf(other.wx);
-        if (WX_KE_ORDER[(otherKeIdx + 1) % 5] === this.wx) return '被克';
+        const otherKeIdx = Element.WX_KE_ORDER.indexOf(other.wx);
+        if (Element.WX_KE_ORDER[(otherKeIdx + 1) % 5] === this.wx) return '被克';
 
         return null;
     }
 
     static getWxIndex(wx) {
-        return WX_ORDER.indexOf(wx);
+        return Element.WX_ORDER.indexOf(wx);
     }
 
     // 旺相休囚死
     getWangRelation(yueLingWx) {
         if (this.wx === yueLingWx) return '旺';
 
-        const myIdx = WX_ORDER.indexOf(this.wx);
-        const yueIdx = WX_ORDER.indexOf(yueLingWx);
+        const myIdx = Element.WX_ORDER.indexOf(this.wx);
+        const yueIdx = Element.WX_ORDER.indexOf(yueLingWx);
 
         const diff = (myIdx - yueIdx + 5) % 5;
         const relations = { 1: '相', 2: '死', 3: '囚', 4: '休' };

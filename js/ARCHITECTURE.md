@@ -1651,3 +1651,4 @@ test/test_bazi_classes.js 测试输出规范如下：
 | v0.9 | 2026-03-21 | 新增输出规范文档（五），定义test_bazi_classes.js完整输出格式及验证要点 |
 | v0.10 | 2026-03-21 | 新增六柱格局计算（calculateSixPillars）：四柱+大运+流年，大运/流年与原局所有柱相邻 |
 | v0.11 | 2026-03-21 | 修复occurrences.pillar记录错误：藏干的pillar原错误记录为柱索引(0-3)，应改为pillars数组索引(1,3,5,7)；相邻关系恢复为同柱相邻(0-1,2-3,4-5,6-7)和隔柱相邻(1-3,3-5,5-7) |
+| v0.12 | 2026-03-21 | 修复常量定义：将WX_SHENG_ORDER、WX_KE_ORDER、WX_ORDER从全局常量移至Element类作为静态属性，符合面向对象设计 |
