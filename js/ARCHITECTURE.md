@@ -2,6 +2,17 @@
 
 ---
 
+## 目录
+
+- [速查表（必读）](#速查表必读)
+- [一、整体架构](#一整体架构)
+- [二、数据层架构](#二数据层架构)
+- [三、核心概念](#三核心概念)
+- [四、输出规范](#四输出规范)
+- [版本历史](#版本历史)
+
+---
+
 ## 速查表（必读）
 
 ### 索引对照表
@@ -55,7 +66,7 @@
 ```
 
 **模块说明：**
-- `bazi_classes.js` - 数据层：Element、 Gan、Zhi、Shishen、BaziContext
+- `bazi_classes.js` - 数据层：Element、 Gan、Zhi、Shishen、ShishenCalculator
 - `shishen_wangshuai.js` - 十神旺衰计算
 - `shishen_pingke.js` - 十神性格特征
 - `shishen_geshi.js` - 十神格局分析
@@ -94,9 +105,8 @@ Element（五行基类）
 - 属性：relationToDayMaster, exists[], occurrences[], isWang, isShouZhi, xiYong
 - 方法：getName(), isDayMaster(), getTouGanStatus(), calculateWang()
 
-**BaziContext（命盘上下文）：**
-- 管理四柱数据、藏干十神、大运流年
-- shishenResults[] - 所有十神的出现位置和状态
+**ShishenCalculator（十神计算器）：**
+- 静态方法：calculateAll(dayMaster, gans, zhis, processedPillars) - 计算所有十神结果
 
 ### 2.2 数据结构
 
@@ -263,6 +273,7 @@ Element（五行基类）
 | v0.10 | 2026-03-21 | 新增六柱格局计算 |
 | v0.11 | 2026-03-21 | 修复occurrences.pillar记录错误 |
 | v0.12 | 2026-03-21 | 修复常量定义：WX_SHENG_ORDER等移至Element静态属性 |
+| v0.13 | 2026-03-22 | 删除BaziContext类，改造计算器接口直接接收数据 |
 
 ---
 

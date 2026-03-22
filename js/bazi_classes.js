@@ -211,6 +211,18 @@ class Zhi extends Element {
         this.isKongWang = 0;  // 空亡开关：1=空亡（由分析层在判断时设置）
     }
 
+    /**
+     * 设置藏干的十神（从排盘数据）
+     * @param {Array} hiddenData - 排盘数据中的藏干数组 [{stem, god, type}, ...]
+     */
+    setupHiddenShishen(hiddenData) {
+        this.hiddenGans.forEach((hgan, i) => {
+            if (hiddenData[i]) {
+                hgan._shishen = hiddenData[i].god || '';
+            }
+        });
+    }
+
     getMainStem() { return this.hiddenGans[0]; }
     getMiddleStem() { return this.hiddenGans[1] || null; }
     getRemainderStem() { return this.hiddenGans[2] || null; }
@@ -360,15 +372,22 @@ class ShishenCalculator {
         return new Shishen(pillar.gan, pillarIndex * 2, tenGod);
     }
 
-    static calculateAll(ctx, processedPillars) {
-        const dayMaster = ctx.dayMaster;
+    /**
+     * 计算所有十神结果
+     * @param {Gan} dayMaster - 日干（Shishen对象继承自Gan）
+     * @param {Gan[]} gans - 四个天干 [年干, 月干, 日干, 时干]
+     * @param {Zhi[]} zhis - 四个地支 [年支, 月支, 日支, 时支]
+     * @param {Object[]} processedPillars - 排盘结果中的pillars数组
+     * @returns {Array} shishenResults数组
+     */
+    static calculateAll(dayMaster, gans, zhis, processedPillars) {
         const results = [];
 
         // Map: 十神名称 -> { shishen: Shishen, occurrences: [], exists: [0, 0] }
         const shishenMap = new Map();
 
         // 遍历天干（年干、月干、日干、时干）
-        ctx.getAllGans().forEach((gan, pillarIdx) => {
+        gans.forEach((gan, pillarIdx) => {
             const tenGod = processedPillars[pillarIdx].tenGod || '';
             // 跳过元男/元女（日干自己，不是十神）
             if (!tenGod || tenGod === '元男' || tenGod === '元女') return;
@@ -393,9 +412,10 @@ class ShishenCalculator {
         });
 
         // 遍历藏干
-        const zhiIndices = [1, 3, 5, 7];  // 年支、月支、日支、时支
-        zhiIndices.forEach((zhiIdx) => {
-            const zhi = ctx.pillars[zhiIdx];
+        zhis.forEach((zhi, zhiIdx) => {
+            // 设置藏干十神
+            const hiddenData = processedPillars[zhiIdx].hidden || [];
+            zhi.setupHiddenShishen(hiddenData);
 
             zhi.hiddenGans.forEach((hiddenGan) => {
                 const tenGod = hiddenGan.getShishen();
@@ -414,7 +434,7 @@ class ShishenCalculator {
                 entry.shishen.exists[1] = 1;
                 // 添加 occurrence
                 entry.shishen.occurrences.push({
-                    pillar: zhiIdx,  // pillars数组索引: 1=年支, 3=月支, 5=日支, 7=时支
+                    pillar: zhi.pillarIndex,  // pillars数组索引: 1=年支, 3=月支, 5=日支, 7=时支
                     occurs: [0, 1],  // 藏干
                     role: hiddenGan.getHiddenRole()  // 本气/中气/余气
                 });
@@ -422,7 +442,7 @@ class ShishenCalculator {
         });
 
         // 计算所有十神的旺衰（根据月令）
-        const yueLingWx = ctx.pillars[3].wx;  // 月支的五行就是月令
+        const yueLingWx = zhis[1].wx;  // 月支的五行就是月令
         shishenMap.forEach((entry) => {
             entry.shishen.calculateWang(yueLingWx);
         });
@@ -441,246 +461,7 @@ class ShishenCalculator {
     }
 }
 
-// =============================================
-// BaziContext（命盘上下文）
-// =============================================
-
-class BaziContext {
-    /**
-     * 从 paipan_result.js 的 calculateBazi() 结果创建 BaziContext
-     * @param {Object} paipanResult - calculateBazi() 返回的对象
-     */
-    constructor(paipanResult) {
-        // 保存原始数据
-        this.raw = paipanResult;
-        // paipan_node_core.js 使用 solarDate/lunarDate 字段
-        this.dateStr = paipanResult.solarDate || paipanResult.dateStr || '';
-        this.lunarStr = paipanResult.lunarDate || paipanResult.lunarStr || '';
-        // paipan_node_core.js 返回 gender: '男'/'女' 字符串
-        this.gender = paipanResult.gender || (paipanResult.isMale ? '男' : '女');
-        this.isMale = this.gender === '男';
-
-        const processed = paipanResult.pillars;  // 排盘处理后的四柱数据
-
-        // === 创建pillars数组 ===
-        // 0=年干, 1=年支, 2=月干, 3=月支, 4=日干, 5=日支, 6=时干, 7=时支
-        this.pillars = [
-            new Gan(processed[0].gan, 0),   // [0] 年天干
-            new Zhi(processed[0].zhi, 1),   // [1] 年地支
-            new Gan(processed[1].gan, 2),   // [2] 月天干
-            new Zhi(processed[1].zhi, 3),   // [3] 月地支
-            new Gan(processed[2].gan, 4),   // [4] 日天干
-            new Zhi(processed[2].zhi, 5),   // [5] 日地支
-            new Gan(processed[3].gan, 6),   // [6] 时天干
-            new Zhi(processed[3].zhi, 7)    // [7] 时地支
-        ];
-
-        // === 从排盘数据搬运到地支 ===
-        // 年柱
-        this.pillars[1].naYin = processed[0].naYin || '';
-        this.pillars[1].kongWang = processed[0].kongWang || [];
-        this.pillars[1].shenSha = processed[0].shenSha || [];
-        // 月柱
-        this.pillars[3].naYin = processed[1].naYin || '';
-        this.pillars[3].kongWang = processed[1].kongWang || [];
-        this.pillars[3].shenSha = processed[1].shenSha || [];
-        // 日柱
-        this.pillars[5].naYin = processed[2].naYin || '';
-        this.pillars[5].kongWang = processed[2].kongWang || [];
-        this.pillars[5].shenSha = processed[2].shenSha || [];
-        // 时柱
-        this.pillars[7].naYin = processed[3].naYin || '';
-        this.pillars[7].kongWang = processed[3].kongWang || [];
-        this.pillars[7].shenSha = processed[3].shenSha || [];
-
-        // === 设置藏干十神（关联属性模式）===
-        this._setupHiddenGansShishen(processed);
-
-        // === 设置地支关系（冲害破刑）===
-        this._setupZhiRelations();
-
-        // === 日主 ===
-        this.dayMaster = this.pillars[4];  // 日干
-
-        // === 计算十神（从排盘数据直接获取）===
-        this.shishenResults = ShishenCalculator.calculateAll(this, processed);
-
-        // === 搬运身强身弱、用神喜忌 ===
-        // paipan_node_core.js 的 bodyStrength 是 { status, score }，适配为 { level, score }
-        if (paipanResult.bodyStrength) {
-            this.bodyStrength = {
-                level: paipanResult.bodyStrength.status || paipanResult.bodyStrength.level,
-                score: paipanResult.bodyStrength.score,
-                percentage: paipanResult.bodyStrength.percentage
-            };
-        } else {
-            this.bodyStrength = {};
-        }
-        // yongXiJi 在 paipan_node_core.js 中可能不存在或结构不同
-        this.yongXiJi = paipanResult.yongXiJi || {};
-
-        // === 搬运大运 ===
-        this.daYunList = paipanResult.daYunList || [];
-        this.currentDaYun = paipanResult.currentDaYun || null;
-
-        // === 快捷访问 ===
-        this.yearGan = this.pillars[0];
-        this.yearZhi = this.pillars[1];
-        this.monthGan = this.pillars[2];
-        this.monthZhi = this.pillars[3];
-        this.dayZhi = this.pillars[5];
-        this.hourGan = this.pillars[6];
-        this.hourZhi = this.pillars[7];
-    }
-
-    _setupZhiRelations() {
-        const zhis = [this.pillars[1], this.pillars[3], this.pillars[5], this.pillars[7]];
-        for (let i = 0; i < zhis.length; i++) {
-            for (let j = i + 1; j < zhis.length; j++) {
-                const zi = zhis[i], zj = zhis[j];
-                if (zi.isChong(zj)) { zi.chongWith = zj.name; zj.chongWith = zi.name; }
-                if (zi.isHe(zj)) { zi.heWith = zj.name; zj.heWith = zi.name; }
-            }
-        }
-    }
-
-    // 设置藏干的十神（关联属性模式）
-    _setupHiddenGansShishen(processed) {
-        const zhiIndices = [1, 3, 5, 7];  // 年支、月支、日支、时支
-        zhiIndices.forEach((zhiIdx, pillarIdx) => {
-            const hiddenData = processed[pillarIdx].hidden || [];
-            hiddenData.forEach((h, i) => {
-                if (this.pillars[zhiIdx].hiddenGans[i]) {
-                    this.pillars[zhiIdx].hiddenGans[i]._shishen = h.god || '';
-                }
-            });
-        });
-    }
-
-    getAllGans() {
-        return [this.pillars[0], this.pillars[2], this.pillars[4], this.pillars[6]];
-    }
-
-    getAllZhis() {
-        return [this.pillars[1], this.pillars[3], this.pillars[5], this.pillars[7]];
-    }
-
-    // === 大运/流年相关 ===
-
-    /**
-     * 创建大运柱（天干或地支），设置 isDaYun=1
-     * @param {string} name - 天干或地支名称
-     * @param {number} pillarIndex - 位置索引
-     * @param {string} type - '天干' 或 '地支'
-     * @returns {Gan|Zhi}
-     */
-    createDaYunPillar(name, pillarIndex, type) {
-        const pillar = type === '天干' ? new Gan(name, pillarIndex) : new Zhi(name, pillarIndex);
-        pillar.isDaYun = 1;
-        return pillar;
-    }
-
-    /**
-     * 创建流年柱（天干或地支），设置 isLiuNian=1
-     * @param {string} name - 天干或地支名称
-     * @param {number} pillarIndex - 位置索引
-     * @param {string} type - '天干' 或 '地支'
-     * @returns {Gan|Zhi}
-     */
-    createLiuNianPillar(name, pillarIndex, type) {
-        const pillar = type === '天干' ? new Gan(name, pillarIndex) : new Zhi(name, pillarIndex);
-        pillar.isLiuNian = 1;
-        return pillar;
-    }
-
-    /**
-     * 获取大运柱的相邻位置
-     * @returns {number[]} 相邻位置数组
-     */
-    getDaYunAdjacentPositions() {
-        // 大运柱与原局所有柱(0-7)都相邻
-        return [0, 1, 2, 3, 4, 5, 6, 7];
-    }
-
-    /**
-     * 获取流年柱的相邻位置
-     * @returns {number[]} 相邻位置数组
-     */
-    getLiuNianAdjacentPositions() {
-        // 流年柱与原局所有柱(0-7)都相邻
-        return [0, 1, 2, 3, 4, 5, 6, 7];
-    }
-
-    getPillarAt(index) {
-        return {
-            gan: this.pillars[index * 2],
-            zhi: this.pillars[index * 2 + 1]
-        };
-    }
-
-    getShishenAt(index) {
-        // index is 0-3 representing 年/月/日/时 pillar
-        // Find shishen result that has a main stem (天干, occurs[0]=1) at this pillar
-        return this.shishenResults.find(r =>
-            r.occurrences.some(o => o.pillar === index && o.occurs[0] === 1)
-        );
-    }
-
-    getGodByIndex(pillarIndex) {
-        if (pillarIndex % 2 === 0) {
-            // 天干
-            return this.pillars[pillarIndex];
-        } else {
-            // 地支
-            return this.pillars[pillarIndex];
-        }
-    }
-
-    toJSON() {
-        return {
-            pillars: this.pillars.map((p, i) => ({
-                name: p.name,
-                type: p.type,
-                wx: p.wx,
-                yinyang: p.yinyang,
-                pillarIndex: p.pillarIndex,
-                ...(p instanceof Zhi && {
-                    hiddenGans: p.hiddenGans.map(h => ({name: h.name, wx: h.wx, yinyang: h.yinyang, shishen: h.getShishen()})),
-                    naYin: p.naYin,
-                    kongWang: p.kongWang,
-                    shenSha: p.shenSha
-                })
-            })),
-            dayMaster: { name: this.dayMaster.name, wx: this.dayMaster.wx, yinyang: this.dayMaster.yinyang },
-            gender: this.gender,
-            bodyStrength: this.bodyStrength,
-            yongXiJi: this.yongXiJi,
-            daYunList: this.daYunList,
-            currentDaYun: this.currentDaYun,
-            shishen: this.shishenResults.map(r => ({
-                gan: r.ganName,
-                shishen: r.shishen.getName(),
-                exists: r.exists,
-                occurrences: r.occurrences
-            }))
-        };
-    }
-}
-
-// =============================================
-// 辅助函数：创建 BaziContext
-// =============================================
-
-/**
- * 从 calculateBazi() 结果创建 BaziContext
- * @param {Object} paipanResult - calculateBazi() 的返回值
- * @returns {BaziContext}
- */
-function createBaziContext(paipanResult) {
-    return new BaziContext(paipanResult);
-}
-
 // 导出
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { BaziContext, createBaziContext, Gan, Zhi, Shishen, Element };
+    module.exports = { Gan, Zhi, Shishen, ShishenCalculator, Element };
 }

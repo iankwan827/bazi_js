@@ -19,23 +19,23 @@ const SHISHEN_CATEGORY = {
 class ShishenGeshiCalculator {
     /**
      * 计算十神格局
-     * @param {BaziContext} ctx - 命盘上下文
+     * @param {Array} shishenResults - 十神结果数组
      * @returns {Object} 格局分析结果
      */
-    static calculate(ctx) {
+    static calculate(shishenResults) {
         const result = {
-            patterns: [],          // 存在的格局列表
-            caiGuanYin: null,    // 财官印相生
-            biJieShiShangCai: null, // 比肩食伤生财
+            patterns: [],
+            caiGuanYin: null,
+            biJieShiShangCai: null,
             details: []
         };
 
         // 查找各类十神
-        const cai = this._findShishen(ctx, ['偏财', '正财']);
-        const guan = this._findShishen(ctx, ['七杀', '正官']);
-        const yin = this._findShishen(ctx, ['偏印', '正印']);
-        const biJie = this._findShishen(ctx, ['比肩', '劫财']);
-        const shiShang = this._findShishen(ctx, ['食神', '伤官']);
+        const cai = this._findShishen(shishenResults, ['偏财', '正财']);
+        const guan = this._findShishen(shishenResults, ['七杀', '正官']);
+        const yin = this._findShishen(shishenResults, ['偏印', '正印']);
+        const biJie = this._findShishen(shishenResults, ['比肩', '劫财']);
+        const shiShang = this._findShishen(shishenResults, ['食神', '伤官']);
 
         // 判断财官印相生：财→官→印
         const caiGuanYinChain = this._checkXiangShengChain(cai, guan, yin);
@@ -51,7 +51,6 @@ class ShishenGeshiCalculator {
             result.biJieShiShangCai = biJieShiShangCaiChain;
         }
 
-        // 汇总详情
         result.details.push(caiGuanYinChain);
         result.details.push(biJieShiShangCaiChain);
 
@@ -59,15 +58,14 @@ class ShishenGeshiCalculator {
     }
 
     /**
-     * 查找指定类型的十神（只查找天干和地支本气，忽略中气和余气）
-     * @param {BaziContext} ctx
+     * 查找指定类型的十神
+     * @param {Array} shishenResults - 十神结果数组
      * @param {Array} names - 十神名称数组
      * @returns {Object|null}
      */
-    static _findShishen(ctx, names) {
-        return ctx.shishenResults.find(r => {
+    static _findShishen(shishenResults, names) {
+        return shishenResults.find(r => {
             if (!names.includes(r.shishen.getName())) return false;
-            // 检查是否有天干或本气的出现
             return this._hasBenQiOccurrence(r);
         }) || null;
     }
@@ -227,45 +225,49 @@ class ShishenGeshiCalculator {
 
     /**
      * 计算六柱格局（原局四柱 + 当前大运 + 当前流年）
-     * 大运和流年作为独立柱加入，与原局所有柱都相邻
-     * @param {BaziContext} ctx - 命盘上下文
-     * @param {Object} currentDaYun - 当前大运数据（来自daYunList）
-     * @param {Object} currentLiuNian - 当前流年数据（来自daYun.liuNian）
-     * @returns {Object} 格局分析结果（格式同calculate）
+     * @param {Array} shishenResults - 十神结果数组
+     * @param {Array} pillars - 原局pillars数组
+     * @param {Gan[]} gans - 四个天干
+     * @param {Zhi[]} zhis - 四个地支
+     * @param {Object} currentDaYun - 当前大运数据
+     * @param {Object} currentLiuNian - 当前流年数据
+     * @param {Gan} GanClass - Gan类
+     * @param {Zhi} ZhiClass - Zhi类
+     * @returns {Object} 格局分析结果
      */
-    static calculateSixPillars(ctx, currentDaYun, currentLiuNian) {
+    static calculateSixPillars(shishenResults, pillars, gans, zhis, currentDaYun, currentLiuNian, GanClass, ZhiClass) {
         if (!currentDaYun || !currentLiuNian) {
-            return this.calculate(ctx);  // 降级到四柱计算
+            return this.calculate(shishenResults);
         }
 
         // 创建大运和流年柱
-        const dayunGan = new (require('./bazi_classes.js').Gan)(currentDaYun.gan, 8);
+        const dayunGan = new GanClass(currentDaYun.gan, 8);
         dayunGan.isDaYun = 1;
-        dayunGan.shishen = currentDaYun.tenGod;  // 大运天干本身的十神
+        dayunGan.shishen = currentDaYun.tenGod;
 
-        const dayunZhi = new (require('./bazi_classes.js').Zhi)(currentDaYun.zhi, 9);
+        const dayunZhi = new ZhiClass(currentDaYun.zhi, 9);
         dayunZhi.isDaYun = 1;
 
-        const liunianGan = new (require('./bazi_classes.js').Gan)(currentLiuNian.gan, 10);
+        const liunianGan = new GanClass(currentLiuNian.gan, 10);
         liunianGan.isLiuNian = 1;
-        liunianGan.shishen = currentLiuNian.tenGod;  // 流年天干本身的十神
+        liunianGan.shishen = currentLiuNian.tenGod;
 
-        const liunianZhi = new (require('./bazi_classes.js').Zhi)(currentLiuNian.zhi, 11);
+        const liunianZhi = new ZhiClass(currentLiuNian.zhi, 11);
         liunianZhi.isLiuNian = 1;
 
-        // 构建六柱数组（0-7原局，8大运天干，9大运地支，10流年天干，11流年地支）
+        // 构建六柱数组
         const sixPillars = [
-            ctx.pillars[0], ctx.pillars[1], ctx.pillars[2], ctx.pillars[3],
-            ctx.pillars[4], ctx.pillars[5], ctx.pillars[6], ctx.pillars[7],
+            pillars[0], pillars[1], pillars[2], pillars[3],
+            pillars[4], pillars[5], pillars[6], pillars[7],
             dayunGan, dayunZhi, liunianGan, liunianZhi
         ];
 
-        // 查找各类十神（包含大运和流年的天干）
-        const cai = this._findShishenInSixPillars(sixPillars, ['偏财', '正财'], ctx.shishenResults);
-        const guan = this._findShishenInSixPillars(sixPillars, ['七杀', '正官'], ctx.shishenResults);
-        const yin = this._findShishenInSixPillars(sixPillars, ['偏印', '正印'], ctx.shishenResults);
-        const biJie = this._findShishenInSixPillars(sixPillars, ['比肩', '劫财'], ctx.shishenResults);
-        const shiShang = this._findShishenInSixPillars(sixPillars, ['食神', '伤官'], ctx.shishenResults);
+        // 查找各类十神
+        const cai = this._findShishenInSixPillars(sixPillars, ['偏财', '正财'], shishenResults);
+        const guan = this._findShishenInSixPillars(sixPillars, ['七杀', '正官'], shishenResults);
+        const yin = this._findShishenInSixPillars(sixPillars, ['偏印', '正印'], shishenResults);
+        const biJie = this._findShishenInSixPillars(sixPillars, ['比肩', '劫财'], shishenResults);
+        const shiShang = this._findShishenInSixPillars(sixPillars, ['食神', '伤官'], shishenResults);
 
         const result = {
             patterns: [],
@@ -274,14 +276,14 @@ class ShishenGeshiCalculator {
             details: []
         };
 
-        // 判断财官印相生：财→官→印
+        // 判断财官印相生
         const caiGuanYinChain = this._checkSixPillarChain(cai, guan, yin, sixPillars);
         if (caiGuanYinChain.matched) {
             result.patterns.push('财官印相生');
             result.caiGuanYin = caiGuanYinChain;
         }
 
-        // 判断比肩食伤生财：比劫→食伤→财
+        // 判断比肩食伤生财
         const biJieShiShangCaiChain = this._checkSixPillarChain(biJie, shiShang, cai, sixPillars);
         if (biJieShiShangCaiChain.matched) {
             result.patterns.push('比肩食伤生财');
@@ -295,27 +297,24 @@ class ShishenGeshiCalculator {
     }
 
     /**
-     * 在六柱中查找指定十神（包含大运和流年天干）
+     * 在六柱中查找指定十神
      * @param {Array} sixPillars - 六柱数组
      * @param {Array} names - 十神名称数组
      * @param {Array} shishenResults - 原局shishenResults
      * @returns {Object|null}
      */
     static _findShishenInSixPillars(sixPillars, names, shishenResults) {
-        // 先从原局shishenResults找
         const original = shishenResults.find(r => {
             if (!names.includes(r.shishen.getName())) return false;
             return this._hasBenQiOccurrence(r);
         });
 
-        // 检查大运天干(位置8)和流年天干(位置10)
         const dayunGan = sixPillars[8];
         const liunianGan = sixPillars[10];
 
         const positions = [];
 
         if (original) {
-            // 收集原局位置
             for (const occ of original.occurrences) {
                 if (occ.role === null || occ.role === '本气') {
                     positions.push({ pillar: occ.pillar, gan: original.shishen });
@@ -323,12 +322,10 @@ class ShishenGeshiCalculator {
             }
         }
 
-        // 检查大运天干
         if (dayunGan && names.includes(dayunGan.shishen)) {
             positions.push({ pillar: 8, gan: dayunGan });
         }
 
-        // 检查流年天干
         if (liunianGan && names.includes(liunianGan.shishen)) {
             positions.push({ pillar: 10, gan: liunianGan });
         }

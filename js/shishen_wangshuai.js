@@ -76,13 +76,15 @@ const HE_TABLE = [
 class ShishenWangShuaiCalculator {
     /**
      * 计算所有十神的旺衰
-     * @param {BaziContext} ctx - 命盘上下文
+     * @param {Array} shishenResults - 十神结果数组
+     * @param {Zhi[]} zhis - 四个地支 [年支, 月支, 日支, 时支]
+     * @param {Gan[]} pillars - pillars数组（天干+地支交错）
      * @param {Object} bodyStrength - 身强身弱结果 { level, score, percentage }
      */
-    static calculateAll(ctx, bodyStrength) {
-        const yueLingWx = ctx.pillars[3].wx;  // 月令五行
+    static calculateAll(shishenResults, zhis, pillars, bodyStrength) {
+        const yueLingWx = zhis[1].wx;  // 月令五行
 
-        ctx.shishenResults.forEach(result => {
+        shishenResults.forEach(result => {
             const shishen = result.shishen;
 
             // 1. 得月令（旺相休囚死）
@@ -90,13 +92,13 @@ class ShishenWangShuaiCalculator {
             const wangRelation = shishen.getWangRelation(yueLingWx);
 
             // 2. 本柱通根/禄/刃
-            const benTongGen = this._hasBenTongGen(shishen.name, ctx);
+            const benTongGen = this._hasBenTongGen(shishen.name, zhis);
 
             // 3. 原局本气根数量
-            const benQiRoots = this._countBenQiRoots(shishen.name, ctx);
+            const benQiRoots = this._countBenQiRoots(shishen.name, zhis);
 
             // 4. 原局中气根数量
-            const zhongQiRoots = this._countZhongQiRoots(shishen.name, ctx);
+            const zhongQiRoots = this._countZhongQiRoots(shishen.name, zhis);
 
             // 综合判断旺衰
             // 旺的条件：得月令 OR 本柱通根 OR 至少一个本气根 OR 至少两个中气根
@@ -104,7 +106,7 @@ class ShishenWangShuaiCalculator {
             shishen.isWang = isWang ? 1 : 0;
 
             // 计算受制状态
-            shishen.isShouZhi = this._calculateShouZhi(shishen, ctx);
+            shishen.isShouZhi = this._calculateShouZhi(shishen, zhis, pillars);
 
             // 计算喜用忌闲
             shishen.xiYong = this._calculateXiYong(shishen, bodyStrength);
@@ -115,18 +117,15 @@ class ShishenWangShuaiCalculator {
      * 判断是否有本柱通根
      * 本柱通根 = 天干作为本气出现在任何地支的藏干中
      * @param {string} ganName - 天干名
-     * @param {BaziContext} ctx
+     * @param {Zhi[]} zhis - 四个地支
      * @returns {boolean}
      */
-    static _hasBenTongGen(ganName, ctx) {
-        // 检查原局所有地支的藏干，看是否有本气通根
-        const zhis = ctx.getAllZhis();
+    static _hasBenTongGen(ganName, zhis) {
         for (const zhi of zhis) {
             const mainGan = zhi.getMainStem();
             if (mainGan && mainGan.name === ganName) {
                 return true;
             }
-            // 检查中气余气透出（通根）
             const middleGan = zhi.getMiddleStem();
             if (middleGan && middleGan.name === ganName) {
                 return true;
@@ -143,12 +142,11 @@ class ShishenWangShuaiCalculator {
      * 统计本气根数量
      * 统计该天干作为本气出现在地支藏干中的次数
      * @param {string} ganName - 天干名
-     * @param {BaziContext} ctx
+     * @param {Zhi[]} zhis - 四个地支
      * @returns {number}
      */
-    static _countBenQiRoots(ganName, ctx) {
+    static _countBenQiRoots(ganName, zhis) {
         let count = 0;
-        const zhis = ctx.getAllZhis();
         for (const zhi of zhis) {
             const mainGan = zhi.getMainStem();
             if (mainGan && mainGan.name === ganName) {
@@ -162,12 +160,11 @@ class ShishenWangShuaiCalculator {
      * 统计中气根数量
      * 统计该天干作为中气出现在地支藏干中的次数
      * @param {string} ganName - 天干名
-     * @param {BaziContext} ctx
+     * @param {Zhi[]} zhis - 四个地支
      * @returns {number}
      */
-    static _countZhongQiRoots(ganName, ctx) {
+    static _countZhongQiRoots(ganName, zhis) {
         let count = 0;
-        const zhis = ctx.getAllZhis();
         for (const zhi of zhis) {
             const middleGan = zhi.getMiddleStem();
             if (middleGan && middleGan.name === ganName) {
@@ -185,28 +182,25 @@ class ShishenWangShuaiCalculator {
      * 计算受制状态
      * 制：克、冲、刑、合伴、合化
      * @param {Shishen} shishen
-     * @param {BaziContext} ctx
+     * @param {Zhi[]} zhis - 四个地支
+     * @param {Gan[]} pillars - pillars数组
      * @returns {number} 0=不受制, 1=受制
      */
-    static _calculateShouZhi(shishen, ctx) {
+    static _calculateShouZhi(shishen, zhis, pillars) {
         const shishenName = shishen.name;
 
-        // 检查每个地支的藏干中是否有该十神
-        const zhis = ctx.getAllZhis();
         for (const zhi of zhis) {
-            // 检查该地支的藏干是否包含此十神
             const hiddenNames = zhi.hiddenGans.map(h => h.name);
             if (!hiddenNames.includes(shishenName)) continue;
 
             const zhiPosition = zhi.pillarIndex;
 
             // === 情况1：检查同柱的天干是否克该地支（邻居克）===
-            // 天干位置是 pillarIndex - 1
             const ganPosition = zhiPosition - 1;
-            if (ganPosition >= 0 && ctx.pillars[ganPosition]) {
-                const gan = ctx.pillars[ganPosition];
+            if (ganPosition >= 0 && pillars[ganPosition]) {
+                const gan = pillars[ganPosition];
                 if (this._isKe(gan.wx, zhi.wx)) {
-                    return 1;  // 同柱天干克地支，受制
+                    return 1;
                 }
             }
 
@@ -214,15 +208,12 @@ class ShishenWangShuaiCalculator {
             for (const otherZhi of zhis) {
                 if (otherZhi.name === zhi.name) continue;
 
-                // 冲：地支六冲
                 if (this._isChong(otherZhi.name, zhi.name)) {
                     return 1;
                 }
-                // 刑：地支相刑
                 if (this._isXing(otherZhi.name, zhi.name)) {
                     return 1;
                 }
-                // 合伴：地支六合
                 if (this._isHe(otherZhi.name, zhi.name)) {
                     return 1;
                 }

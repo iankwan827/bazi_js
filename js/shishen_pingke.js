@@ -81,13 +81,14 @@ const PINGKE_TABLE = {
 class ShishenPingKeCalculator {
     /**
      * 计算所有十神的性格特征
-     * @param {BaziContext} ctx - 命盘上下文
+     * @param {Array} shishenResults - 十神结果数组
+     * @param {Array} pillars - pillars数组
      * @returns {Array} 性格特征数组
      */
-    static calculateAll(ctx) {
+    static calculateAll(shishenResults, pillars) {
         const results = [];
 
-        ctx.shishenResults.forEach(result => {
+        shishenResults.forEach(result => {
             const shishen = result.shishen;
             const shishenName = shishen.getName();
             const xiYong = shishen.xiYong;
@@ -96,7 +97,7 @@ class ShishenPingKeCalculator {
 
             // 获取十神所在的天干位置
             const ganPosition = this._getGanPosition(result);
-            const isFengSheng = this._checkFengSheng(ganPosition, ctx);
+            const isFengSheng = this._checkFengSheng(ganPosition, pillars);
 
             // 判断性格特征
             const category = this._getCategory(shishenName);
@@ -123,19 +124,13 @@ class ShishenPingKeCalculator {
      * @returns {number} 天干位置 (0-7)
      */
     static _getGanPosition(result) {
-        // 找到第一个在天干中出现的 occurrence
         for (const occ of result.occurrences) {
             if (occ.occurs[0] === 1) {
-                // pillar: 0=年, 1=月, 2=日, 3=时
-                // 对应的天干位置: pillar * 2
                 return occ.pillar * 2;
             }
         }
-        // 如果没有天干出现，返回第一个藏干的位置
         if (result.occurrences.length > 0) {
             const occ = result.occurrences[0];
-            // pillar: 0=年, 1=月, 2=日, 3=时
-            // 对应的地支位置: pillar * 2 + 1
             return occ.pillar * 2 + 1;
         }
         return -1;
@@ -143,29 +138,24 @@ class ShishenPingKeCalculator {
 
     /**
      * 检查十神是否逢生
-     * 逢生：相邻天干中有相生的关系（木生火、火生土等通过五行生克判断）
      * @param {number} ganIndex - 天干索引
-     * @param {BaziContext} ctx
+     * @param {Array} pillars - pillars数组
      * @returns {boolean}
      */
-    static _checkFengSheng(ganIndex, ctx) {
-        // 获取该十神所在的所有位置（天干位置 + 藏干所在的地支位置）
-        const positions = this._getShishenPositions(ganIndex, ctx);
+    static _checkFengSheng(ganIndex, pillars) {
+        const positions = this._getShishenPositions(ganIndex, pillars);
         if (positions.length === 0) return false;
 
-        // 检查所有位置是否有逢生关系
         for (const pos of positions) {
-            const pillar = ctx.pillars[pos];
+            const pillar = pillars[pos];
             if (!pillar) continue;
 
-            // 获取该位置的相邻位置
             const adjacentPositions = pillar.getAdjacentPositions();
 
             for (const adjPos of adjacentPositions) {
-                const other = ctx.pillars[adjPos];
+                const other = pillars[adjPos];
                 if (!other || other.type !== '天干') continue;
 
-                // 检查 other 是否生 pillar（相生关系）
                 const relation = other.getRelationTo(pillar);
                 if (relation === '生' || relation === '被生') {
                     return true;
@@ -179,23 +169,21 @@ class ShishenPingKeCalculator {
     /**
      * 获取十神所在的所有位置
      * @param {number} ganIndex - 天干索引
-     * @param {BaziContext} ctx
+     * @param {Array} pillars - pillars数组
      * @returns {Array} 位置数组
      */
-    static _getShishenPositions(ganIndex, ctx) {
-        const ganName = ctx.pillars[ganIndex]?.name;
+    static _getShishenPositions(ganIndex, pillars) {
+        const ganName = pillars[ganIndex]?.name;
         if (!ganName) return [ganIndex];
 
         const positions = [ganIndex];
 
-        // 检查该天干是否作为藏干出现在某个地支中
-        for (let i = 0; i < ctx.pillars.length; i++) {
-            const pillar = ctx.pillars[i];
+        for (let i = 0; i < pillars.length; i++) {
+            const pillar = pillars[i];
             if (pillar.type !== '地支') continue;
 
             for (const hiddenGan of pillar.hiddenGans) {
                 if (hiddenGan.name === ganName) {
-                    // 藏干所在的位置是该地支的 pillarIndex
                     positions.push(pillar.pillarIndex);
                 }
             }
