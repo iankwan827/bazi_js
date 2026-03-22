@@ -5,6 +5,10 @@
 !js/
 !js/**
 
+# Un-ignore the doc folder and its contents
+!doc/
+!doc/**
+
 # Also keep root configuration and documentation
 !.gitignore
 !sync_to_github.bat
